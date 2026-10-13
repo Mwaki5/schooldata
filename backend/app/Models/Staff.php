@@ -21,13 +21,28 @@ class Staff extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'user_id',
         'employment_no',
         'name',
-        'email',
-        'phone',
+        'work_email',
+        'work_phone',
+        'national_id',
+        'kra_pin',
+        'nhif_number',
+        'nssf_number',
         'position',
         'department_id',
-        'is_active',
+        'employment_type',
+        'employment_status',
+        'role',
+        'date_joined',
+        'confirmation_date',
+        'contract_end_date',
+        'termination_date',
+        'termination_reason',
+        'basic_salary',
+        'highest_qualification',
+        'specialization',
         'created_by',
         'updated_by',
     ];
@@ -38,7 +53,7 @@ class Staff extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'is_active' => true,
+        'employment_status' => 'active',
     ];
 
     /**
@@ -49,7 +64,11 @@ class Staff extends Model
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
+            'date_joined' => 'date',
+            'confirmation_date' => 'date',
+            'contract_end_date' => 'date',
+            'termination_date' => 'date',
+            'basic_salary' => 'decimal:2',
         ];
     }
 
@@ -59,6 +78,14 @@ class Staff extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * The provisioned auth account for the staff member.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

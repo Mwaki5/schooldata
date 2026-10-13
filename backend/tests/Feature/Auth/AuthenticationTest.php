@@ -94,6 +94,21 @@ test('an unknown login id is rejected', function () {
     $this->assertGuest();
 });
 
+test('a successful login records sign-in forensics on the user', function () {
+    $user = User::factory()->create();
+
+    $this->postJson('/api/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertOk();
+
+    $user->refresh();
+
+    expect($user->last_login_at)->not->toBeNull()
+        ->and($user->last_login_ip)->toBe('127.0.0.1')
+        ->and($user->last_login_user_agent)->not->toBeNull();
+});
+
 test('authenticated users can fetch their profile', function () {
     $user = User::factory()->create();
 

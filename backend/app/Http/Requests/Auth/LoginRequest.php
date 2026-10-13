@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -60,6 +61,21 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        $this->recordSignIn($this->user());
+    }
+
+    /**
+     * Record the sign-in forensics on the user after a successful
+     * authentication.
+     */
+    protected function recordSignIn(User $user): void
+    {
+        $user->update([
+            'last_login_at' => now(),
+            'last_login_ip' => $this->ip(),
+            'last_login_user_agent' => (string) $this->userAgent(),
+        ]);
     }
 
     /**

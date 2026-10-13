@@ -13,17 +13,42 @@ import {
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-function StatusBadge({ active }) {
+const EMPLOYMENT_TYPE_LABELS = {
+  full_time: 'Full-time',
+  part_time: 'Part-time',
+  contract: 'Contract',
+  intern: 'Intern',
+  volunteer: 'Volunteer',
+}
+
+const ROLE_LABELS = {
+  admin: 'Admin',
+  trainer: 'Trainer',
+  finance: 'Finance',
+}
+
+const STATUS_STYLES = {
+  active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  probation: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  suspended: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+  inactive: 'bg-muted text-muted-foreground',
+  terminated: 'bg-destructive/10 text-destructive',
+  retired: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+}
+
+function StatusBadge({ status }) {
+  const label = status
+    ? status.charAt(0).toUpperCase() + status.slice(1)
+    : 'Unknown'
+
   return (
     <span
       className={cn(
         'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-        active
-          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-          : 'bg-muted text-muted-foreground',
+        STATUS_STYLES[status] ?? STATUS_STYLES.inactive,
       )}
     >
-      {active ? 'Active' : 'Inactive'}
+      {label}
     </span>
   )
 }
@@ -72,7 +97,7 @@ export default function Staff() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Staff</h1>
@@ -120,8 +145,10 @@ export default function Staff() {
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="pb-3 font-medium">Employee No</th>
                   <th className="pb-3 font-medium">Name</th>
+                  <th className="pb-3 font-medium">Role</th>
                   <th className="pb-3 font-medium">Department</th>
                   <th className="pb-3 font-medium">Position</th>
+                  <th className="pb-3 font-medium">Type</th>
                   <th className="pb-3 font-medium">Status</th>
                   <th className="pb-3 text-right font-medium">Actions</th>
                 </tr>
@@ -134,13 +161,20 @@ export default function Staff() {
                     </td>
                     <td className="py-3 font-medium">{staffMember.name}</td>
                     <td className="py-3 text-muted-foreground">
+                      {ROLE_LABELS[staffMember.role] ?? '—'}
+                    </td>
+                    <td className="py-3 text-muted-foreground">
                       {staffMember.department_name ?? '—'}
                     </td>
                     <td className="py-3 text-muted-foreground">
                       {staffMember.position ?? '—'}
                     </td>
+                    <td className="py-3 text-muted-foreground">
+                      {EMPLOYMENT_TYPE_LABELS[staffMember.employment_type] ??
+                        '—'}
+                    </td>
                     <td className="py-3">
-                      <StatusBadge active={staffMember.is_active} />
+                      <StatusBadge status={staffMember.employment_status} />
                     </td>
                     <td className="py-3">
                       <div className="flex items-center justify-end gap-2">

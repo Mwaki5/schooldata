@@ -6,6 +6,7 @@ namespace App\Models;
 use App\Enums\Role;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
@@ -13,7 +14,26 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 class User extends Authenticatable implements JWTSubject
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
+
+    /**
+     * Clear live references when a user is removed.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user) {
+            if ($user->isForceDeleting()) {
+                return;
+            }
+
+            // A soft-deleted user must not remain the head of a
+            // department; hard deletes are cleared by the foreign key.
+            Department::query()
+                ->where('hod_id', $user->id)
+                ->get()
+                ->each(fn (Department $department) => $department->update(['hod_id' => null]));
+        });
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -26,6 +46,35 @@ class User extends Authenticatable implements JWTSubject
         'login_id',
         'password',
         'role',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'gender',
+        'date_of_birth',
+        'nationality',
+        'county',
+        'place_of_birth',
+        'religion',
+        'address',
+        'city',
+        'postal_code',
+        'profile_picture',
+        'alternative_phone',
+        'is_pwd',
+        'disability_type',
+        'disability_description',
+        'must_reset_password',
+        'password_changed_at',
+        'failed_login_attempts',
+        'last_failed_login_at',
+        'locked_until',
+        'two_factor_enabled',
+        'status',
+        'last_login_at',
+        'last_login_ip',
+        'last_login_user_agent',
+        'created_by',
+        'updated_by',
     ];
 
     /**
@@ -61,7 +110,29 @@ class User extends Authenticatable implements JWTSubject
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => Role::class,
+            'date_of_birth' => 'date',
+            'is_pwd' => 'boolean',
+            'must_reset_password' => 'boolean',
+            'password_changed_at' => 'datetime',
+            'failed_login_attempts' => 'integer',
+            'last_failed_login_at' => 'datetime',
+            'locked_until' => 'datetime',
+            'two_factor_enabled' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Compose the display name from the split name parts, e.g.
+     * "Jane Ann Doe".
+     */
+    public static function composeName(?string $firstName, ?string $middleName, ?string $lastName): string
+    {
+        return trim(implode(' ', array_filter([
+            trim((string) $firstName),
+            trim((string) $middleName),
+            trim((string) $lastName),
+        ], fn (string $part) => $part !== '')));
     }
 
     /**

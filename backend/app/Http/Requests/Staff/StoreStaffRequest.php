@@ -2,12 +2,43 @@
 
 namespace App\Http\Requests\Staff;
 
+use App\Enums\Role;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreStaffRequest extends FormRequest
 {
+    /**
+     * The employment types a staff member can hold.
+     *
+     * @var list<string>
+     */
+    public const EMPLOYMENT_TYPES = ['full_time', 'part_time', 'contract', 'intern', 'volunteer'];
+
+    /**
+     * The employment statuses a staff member can hold.
+     *
+     * @var list<string>
+     */
+    public const EMPLOYMENT_STATUSES = ['active', 'probation', 'suspended', 'inactive', 'terminated', 'retired'];
+
+    /**
+     * The gender vocabulary shared by the identity fields.
+     *
+     * @var list<string>
+     */
+    public const GENDERS = ['male', 'female', 'other'];
+
+    /**
+     * The system roles a staff member can hold: every Role enum value
+     * except `student`, since students are not staff. The enum rule
+     * compares cases strictly, so this list holds enum cases.
+     *
+     * @var list<Role>
+     */
+    public const STAFF_ROLES = [Role::Admin, Role::Trainer, Role::Finance];
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -27,20 +58,50 @@ class StoreStaffRequest extends FormRequest
             'employment_no' => [
                 'required',
                 'string',
-                'max:30',
+                'max:50',
                 Rule::unique('staff', 'employment_no')->whereNull('deleted_at'),
             ],
-            'name' => ['required', 'string', 'max:150'],
-            'email' => [
+            'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'gender' => ['nullable', 'string', Rule::in(self::GENDERS)],
+            'date_of_birth' => ['nullable', 'date'],
+            'nationality' => ['nullable', 'string', 'max:100'],
+            'county' => ['nullable', 'string', 'max:100'],
+            'place_of_birth' => ['nullable', 'string', 'max:100'],
+            'religion' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:5000'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'profile_picture' => ['nullable', 'string', 'max:2048'],
+            'alternative_phone' => ['nullable', 'string', 'max:50'],
+            'is_pwd' => ['nullable', 'boolean'],
+            'disability_type' => ['nullable', 'string', 'max:100'],
+            'disability_description' => ['nullable', 'string', 'max:5000'],
+            'work_email' => [
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('staff', 'email')->whereNull('deleted_at'),
+                Rule::unique('staff', 'work_email')->whereNull('deleted_at'),
             ],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'work_phone' => ['nullable', 'string', 'max:50'],
+            'national_id' => ['nullable', 'string', 'max:50'],
+            'kra_pin' => ['nullable', 'string', 'max:50'],
+            'nhif_number' => ['nullable', 'string', 'max:50'],
+            'nssf_number' => ['nullable', 'string', 'max:50'],
             'position' => ['nullable', 'string', 'max:100'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
-            'is_active' => ['nullable', 'boolean'],
+            'employment_type' => ['nullable', 'string', Rule::in(self::EMPLOYMENT_TYPES)],
+            'employment_status' => ['nullable', 'string', Rule::in(self::EMPLOYMENT_STATUSES)],
+            'role' => ['required', 'string', Rule::enum(Role::class)->only(self::STAFF_ROLES)],
+            'date_joined' => ['nullable', 'date'],
+            'confirmation_date' => ['nullable', 'date'],
+            'contract_end_date' => ['nullable', 'date'],
+            'termination_date' => ['nullable', 'date'],
+            'termination_reason' => ['nullable', 'string', 'max:5000'],
+            'basic_salary' => ['nullable', 'numeric', 'min:0'],
+            'highest_qualification' => ['nullable', 'string', 'max:100'],
+            'specialization' => ['nullable', 'string', 'max:255'],
         ];
     }
 }
