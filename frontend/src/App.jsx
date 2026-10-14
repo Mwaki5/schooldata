@@ -19,6 +19,14 @@ const ExamBodies = lazy(() => import('@/pages/exam-bodies/ExamBodies'))
 const ExamBodyForm = lazy(() => import('@/pages/exam-bodies/ExamBodyForm'))
 const CertificationLevels = lazy(() => import('@/pages/certification-levels/CertificationLevels'))
 const CertificationLevelForm = lazy(() => import('@/pages/certification-levels/CertificationLevelForm'))
+const Curricula = lazy(() => import('@/pages/curricula/Curricula'))
+const CurriculumForm = lazy(() => import('@/pages/curricula/CurriculumForm'))
+const Courses = lazy(() => import('@/pages/courses/Courses'))
+const CourseForm = lazy(() => import('@/pages/courses/CourseForm'))
+const AcademicYears = lazy(() => import('@/pages/academic-years/AcademicYears'))
+const AcademicYearForm = lazy(() => import('@/pages/academic-years/AcademicYearForm'))
+const AcademicSessions = lazy(() => import('@/pages/academic-sessions/AcademicSessions'))
+const AcademicSessionForm = lazy(() => import('@/pages/academic-sessions/AcademicSessionForm'))
 const Staff = lazy(() => import('@/pages/staff/Staff'))
 const StaffForm = lazy(() => import('@/pages/staff/StaffForm'))
 const Activities = lazy(() => import('@/pages/activities/Activities'))
@@ -134,6 +142,30 @@ export default function App() {
             <Route
               path="/certification-levels/:levelId/edit"
               element={<CertificationLevelForm />}
+            />
+            <Route path="/curricula" element={<Curricula />} />
+            <Route path="/curricula/create" element={<CurriculumForm />} />
+            <Route
+              path="/curricula/:curriculumId/edit"
+              element={<CurriculumForm />}
+            />
+            <Route path="/courses" element={<Courses />} />
+            <Route path="/courses/create" element={<CourseForm />} />
+            <Route path="/courses/:courseId/edit" element={<CourseForm />} />
+            <Route path="/academic-years" element={<AcademicYears />} />
+            <Route path="/academic-years/create" element={<AcademicYearForm />} />
+            <Route
+              path="/academic-years/:yearId/edit"
+              element={<AcademicYearForm />}
+            />
+            <Route path="/academic-sessions" element={<AcademicSessions />} />
+            <Route
+              path="/academic-sessions/create"
+              element={<AcademicSessionForm />}
+            />
+            <Route
+              path="/academic-sessions/:sessionId/edit"
+              element={<AcademicSessionForm />}
             />
             <Route path="/staff" element={<Staff />} />
             <Route path="/staff/create" element={<StaffForm />} />

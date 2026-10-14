@@ -1,6 +1,17 @@
 @import 'tailwindcss';
 
+/* Class-based dark mode (`.dark` on <html>) instead of the OS default. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
+  --color-page: var(--page);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-line: var(--sidebar-line);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-text: var(--sidebar-text);
+  --color-sidebar-subtle: var(--sidebar-subtle);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -23,10 +34,10 @@
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
 }
 
 @theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
   --animate-sidebar-in: sidebar-in 200ms ease-out;
 
   @keyframes sidebar-in {
@@ -41,14 +52,17 @@
 }
 
 :root {
+  /* Page canvas — separate from `--background` so the login/register
+     `bg-muted/40` wash and the shell canvas can differ from card white. */
+  --page: oklch(0.969 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.596 0.145 163.225); /* emerald-600 */
+  --primary-foreground: oklch(0.985 0 0); /* white — pairs with emerald-600 on buttons */
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -59,8 +73,45 @@
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.9 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.596 0.145 163.225); /* emerald-600 */
   --radius: 0.75rem;
+
+  /* Brand navy — sampled from the reference. The sidebar stays dark in both
+     themes, so these never flip; the border/line/active/text tones are the
+     exact hexes measured off the reference screenshot. */
+  --sidebar: #1b263b;
+  --sidebar-border: #293444; /* 1px seam between sidebar and main */
+  --sidebar-line: #283347; /* section dividers + pill top/bottom edges */
+  --sidebar-active: #273145; /* active/hover row fill inside the pill */
+  --sidebar-text: #b3bfd4; /* inactive nav label/icon */
+  --sidebar-subtle: #8296b0; /* section headings, brand subtitle */
+  --sidebar-accent: #10b981; /* emerald-500 active bar / logo tile */
+}
+
+.dark {
+  /* Exact hexes sampled from the reference screenshot: navbar `#1C2738`,
+     main canvas `#253042` (lighter than the navbar, separated by the
+     `#384251` hairline), text `#ECF2FC`. */
+  --page: #253042;
+  --background: #1c2738;
+  --foreground: #ecf2fc;
+  --card: #2b3647;
+  --card-foreground: #ecf2fc;
+  --popover: #2b3647;
+  --popover-foreground: #ecf2fc;
+  --primary: #10b981; /* emerald-500 — the reference accent bar */
+  --primary-foreground: oklch(0.985 0 0); /* white — emerald bg always pairs with white text */
+  --secondary: #1f2a3c;
+  --secondary-foreground: #ecf2fc;
+  --muted: #1f2a3c;
+  --muted-foreground: #8296b0; /* reference brand subtitle tone */
+  --accent: #273145; /* reference active-nav pill fill */
+  --accent-foreground: #ecf2fc;
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: #384251; /* reference navbar hairline */
+  --input: #384251;
+  --ring: #10b981;
 }
 
 @layer base {
@@ -69,11 +120,51 @@
   }
 
   body {
-      background-color: #F3F4F6;
-    @apply bg-background text-foreground antialiased;
-    font-family: 'Plus Jakarta Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+    @apply bg-page text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* Native date inputs render `mm/dd/yyyy` in the text color, which reads as
+     near-white on dark and dominates the field. Mute just the empty hint in
+     dark mode; the chosen date stays legible in the muted tone. (CSS can't
+     read an input's value, so this is scoped to dark rather than toggled.) */
+  .dark input[type='date']::-webkit-datetime-edit,
+  .dark input[type='datetime-local']::-webkit-datetime-edit {
+    color: var(--muted-foreground);
+  }
+
+  .dark input[type='date']::-webkit-datetime-edit-year-field:focus,
+  .dark input[type='date']::-webkit-datetime-edit-month-field:focus,
+  .dark input[type='date']::-webkit-datetime-edit-day-field:focus {
+    color: var(--foreground);
   }
 }
-tbody tr::even{
 
+/**
+ * Slim scrollbar for the sidebar nav (and any other scroll region that
+ * opts in). Tailwind 4.3.3 ships no scrollbar utilities, so the WebKit
+ * pseudo-elements are written out by hand; `scrollbar-width/color` cover
+ * Firefox, Chromium and recent Safari.
+ */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.22) transparent;
+  overscroll-behavior: contain;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(255 255 255 / 0.22);
+  border-radius: 9999px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(255 255 255 / 0.4);
 }

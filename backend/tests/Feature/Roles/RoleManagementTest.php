@@ -39,6 +39,31 @@ test('the roles endpoint returns the hardcoded catalog in enum order', function 
         ->assertJsonPath('roles.3.name', 'Finance');
 });
 
+test('the roles list supports search, sorting and pagination', function () {
+    $token = rolesAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/roles?search=finan')
+        ->assertOk()
+        ->assertJsonCount(1, 'roles')
+        ->assertJsonPath('roles.0.slug', 'finance');
+
+    $sorted = $this->withToken($token)
+        ->getJson('/api/roles?sort=name&order=desc')
+        ->assertOk();
+
+    expect(collect($sorted->json('roles'))->pluck('name')->all())
+        ->toBe(['Trainer', 'Student', 'Finance', 'Admin']);
+
+    $this->withToken($token)
+        ->getJson('/api/roles?per_page=2&page=2')
+        ->assertOk()
+        ->assertJsonCount(2, 'roles')
+        ->assertJsonPath('meta.current_page', 2)
+        ->assertJsonPath('meta.last_page', 2)
+        ->assertJsonPath('meta.total', 4);
+});
+
 test('roles cannot be tampered with because they no longer live in the database', function () {
     expect(Schema::hasTable('roles'))->toBeFalse();
 

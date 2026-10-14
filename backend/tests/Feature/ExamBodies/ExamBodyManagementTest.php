@@ -34,6 +34,27 @@ test('exam bodies can be listed ordered by name', function () {
         ->assertJsonPath('exam_bodies.1.name', 'ZWA Examination Board');
 });
 
+test('the exam body list supports status filters, sorting and pagination', function () {
+    ExamBody::factory()->create(['name' => 'Amanza Testing Authority', 'code' => 'AMZ', 'is_active' => true]);
+    ExamBody::factory()->create(['name' => 'ZWA Examination Board', 'code' => 'ZWA', 'is_active' => false]);
+
+    $token = examBodiesAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/exam-bodies?is_active=1')
+        ->assertOk()
+        ->assertJsonCount(1, 'exam_bodies')
+        ->assertJsonPath('exam_bodies.0.name', 'Amanza Testing Authority');
+
+    $sorted = $this->withToken($token)
+        ->getJson('/api/exam-bodies?sort=code&order=desc')
+        ->assertOk();
+
+    expect(collect($sorted->json('exam_bodies'))->pluck('code')->all())
+        ->toBe(['ZWA', 'AMZ'])
+        ->and($sorted->json('meta.total'))->toBe(2);
+});
+
 test('an exam body can be created with every field and audit stamps', function () {
     $creator = User::factory()->create();
 

@@ -108,7 +108,7 @@ export default function ExamBodyForm() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <div
           role="alert"
           className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
@@ -127,7 +127,7 @@ export default function ExamBodyForm() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <Link
         to="/exam-bodies"
         className={buttonVariants({ variant: 'ghost' })}
@@ -150,7 +150,7 @@ export default function ExamBodyForm() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-5 lg:grid-cols-3">
               <FormField
                 id="code"
                 label="Code"

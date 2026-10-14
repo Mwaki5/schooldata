@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
-import api from '@/lib/api'
+import { ListPagination } from '@/components/list-pagination'
+import { ListSearch } from '@/components/list-search'
+import { SortableTh } from '@/components/sortable-th'
+import { useList } from '@/hooks/use-list'
 import { cn } from '@/lib/utils'
 
 const EVENT_STYLES = {
@@ -135,67 +137,46 @@ function DetailsCell({ activity }) {
 }
 
 export default function Activities() {
-  const [activities, setActivities] = useState([])
-  const [meta, setMeta] = useState(null)
   const [events, setEvents] = useState([])
   const [subjectTypes, setSubjectTypes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(null)
-  const [page, setPage] = useState(1)
   const [eventFilter, setEventFilter] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('')
 
-  useEffect(() => {
-    api
-      .get('/activities', {
-        params: {
-          page,
-          event: eventFilter || undefined,
-          subject_type: subjectFilter || undefined,
-        },
-      })
-      .then(({ data }) => {
-        setActivities(data.activities)
-        setMeta(data.meta)
-        setEvents(data.filters.events)
-        setSubjectTypes(data.filters.subject_types)
-        setLoadError(null)
-      })
-      .catch(() =>
-        setLoadError('Unable to load the activity log. Please try again.'),
-      )
-      .finally(() => setLoading(false))
-  }, [page, eventFilter, subjectFilter])
-
-  /** Page navigation: flip to loading, then let the effect refetch. */
-  const goToPage = (nextPage) => {
-    setLoading(true)
-    setPage(nextPage)
-  }
-
-  /** Filter changes always restart from the first page. */
-  const applyFilters = (nextEvent, nextSubject) => {
-    setLoading(true)
-    setPage(1)
-    setEventFilter(nextEvent)
-    setSubjectFilter(nextSubject)
-  }
-
-  const handleEventChange = (event) => {
-    applyFilters(event.target.value, subjectFilter)
-  }
-
-  const handleSubjectChange = (event) => {
-    applyFilters(eventFilter, event.target.value)
-  }
+  const {
+    items: activities,
+    meta,
+    loading,
+    loadError,
+    search,
+    setSearch,
+    goToPage,
+    sort,
+    order,
+    toggleSort,
+  } = useList({
+    resource: 'activities',
+    endpoint: '/activities',
+    errorMessage: 'Unable to load the activity log. Please try again.',
+    filters: {
+      event: eventFilter || undefined,
+      subject_type: subjectFilter || undefined,
+    },
+    // The activity endpoint answers with extra payloads (the filter option
+    // lists) beside the items and meta.
+    onData: (data) => {
+      setEvents(data.filters.events)
+      setSubjectTypes(data.filters.subject_types)
+    },
+  })
 
   const clearFilters = () => {
-    applyFilters('', '')
+    setEventFilter('')
+    setSubjectFilter('')
+    setSearch('')
   }
 
-  const hasFilters = eventFilter !== '' || subjectFilter !== ''
-  const start = meta ? (meta.current_page - 1) * meta.per_page + 1 : 0
-  const end = meta ? Math.min(meta.current_page * meta.per_page, meta.total) : 0
+  const hasFilters =
+    eventFilter !== '' || subjectFilter !== '' || search !== ''
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -216,22 +197,20 @@ export default function Activities() {
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>
-            {loading
-              ? 'Loading activity…'
-              : `${meta?.total ?? 0} ${
-                  (meta?.total ?? 0) === 1 ? 'activity' : 'activities'
-                } total`}
-          </CardDescription>
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search activity…"
+          />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-48">
               <Select
                 value={eventFilter}
-                onChange={handleEventChange}
+                onChange={(event) => setEventFilter(event.target.value)}
                 aria-label="Filter by event"
               >
                 <option value="">All events</option>
@@ -245,7 +224,7 @@ export default function Activities() {
             <div className="w-64">
               <Select
                 value={subjectFilter}
-                onChange={handleSubjectChange}
+                onChange={(event) => setSubjectFilter(event.target.value)}
                 aria-label="Filter by subject type"
               >
                 <option value="">All subjects</option>
@@ -272,18 +251,32 @@ export default function Activities() {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : activities.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {hasFilters
-                ? 'No activities match the selected filters.'
-                : 'No activity recorded yet.'}
+              {search
+                ? `No activities match “${search}”.`
+                : hasFilters
+                  ? 'No activities match the selected filters.'
+                  : 'No activity recorded yet.'}
             </p>
           ) : (
             <>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">When</th>
+                    <SortableTh
+                      column="created_at"
+                      label="When"
+                      sort={sort}
+                      order={order}
+                      onSort={toggleSort}
+                    />
                     <th className="pb-3 font-medium">User</th>
-                    <th className="pb-3 font-medium">Event</th>
+                    <SortableTh
+                      column="event"
+                      label="Event"
+                      sort={sort}
+                      order={order}
+                      onSort={toggleSort}
+                    />
                     <th className="pb-3 font-medium">Subject</th>
                     <th className="pb-3 font-medium">Details</th>
                   </tr>
@@ -322,36 +315,12 @@ export default function Activities() {
                 </tbody>
               </table>
 
-              {meta && (
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                  <p className="text-sm text-muted-foreground">
-                    Showing {start}–{end} of {meta.total} activities
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={loading || meta.current_page <= 1}
-                      onClick={() => goToPage(meta.current_page - 1)}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Page {meta.current_page} of {meta.last_page}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={loading || meta.current_page >= meta.last_page}
-                      onClick={() => goToPage(meta.current_page + 1)}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <ListPagination
+                meta={meta}
+                loading={loading}
+                onPageChange={goToPage}
+                label="activities"
+              />
             </>
           )}
         </CardContent>

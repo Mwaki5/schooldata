@@ -52,6 +52,39 @@ test('staff can be listed ordered by employment number with their department', f
         ->assertJsonPath('staff.0.department_name', null);
 });
 
+test('the staff list supports department filters, sorting and pagination', function () {
+    $department = Department::factory()->create(['name' => 'Computing and Informatics']);
+
+    Staff::factory()->create([
+        'employment_no' => 'EMP-0001',
+        'name' => 'Adam Clerk',
+        'department_id' => null,
+    ]);
+    Staff::factory()->create([
+        'employment_no' => 'EMP-0002',
+        'name' => 'Zoe Writer',
+        'department_id' => $department->id,
+    ]);
+
+    $token = staffAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/staff?department_id='.$department->id)
+        ->assertOk()
+        ->assertJsonCount(1, 'staff')
+        ->assertJsonPath('staff.0.name', 'Zoe Writer');
+
+    $sorted = $this->withToken($token)
+        ->getJson('/api/staff?sort=name&order=desc')
+        ->assertOk();
+
+    expect(collect($sorted->json('staff'))->pluck('name')->all())
+        ->toBe(['Zoe Writer', 'Adam Clerk'])
+        ->and($sorted->json('meta.total'))->toBe(2);
+
+    $this->withToken($token)->getJson('/api/staff?sort=user_id')->assertUnprocessable();
+});
+
 test('creating staff provisions an account and returns a one-time temporary password', function () {
     $creator = User::factory()->create();
     $department = Department::factory()->create();

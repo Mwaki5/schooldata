@@ -1,9 +1,13 @@
 <?php
 
+use App\Http\Controllers\AcademicSessions\AcademicSessionController;
+use App\Http\Controllers\AcademicYears\AcademicYearController;
 use App\Http\Controllers\Activities\ActivityController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CertificationLevels\CertificationLevelController;
+use App\Http\Controllers\Courses\CourseController;
+use App\Http\Controllers\Curriculums\CurriculumController;
 use App\Http\Controllers\Departments\DepartmentController;
 use App\Http\Controllers\ExamBodies\ExamBodyController;
 use App\Http\Controllers\Roles\RoleController;
@@ -119,6 +123,90 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('certification-levels.destroy');
+
+    Route::get('curricula', [CurriculumController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('curricula.index');
+    Route::post('curricula', [CurriculumController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('curricula.store');
+    Route::get('curricula/{curriculum}', [CurriculumController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('curricula.show');
+    Route::match(['PUT', 'PATCH'], 'curricula/{curriculum}', [CurriculumController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('curricula.update');
+    Route::delete('curricula/{curriculum}', [CurriculumController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('curricula.destroy');
+
+    Route::get('courses', [CourseController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('courses.index');
+    Route::post('courses', [CourseController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('courses.store');
+    Route::get('courses/{course}', [CourseController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('courses.show');
+    Route::match(['PUT', 'PATCH'], 'courses/{course}', [CourseController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('courses.update');
+    Route::delete('courses/{course}', [CourseController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('courses.destroy');
+
+    Route::get('academic-years', [AcademicYearController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-years.index');
+    Route::post('academic-years', [AcademicYearController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-years.store');
+    Route::get('academic-years/{academicYear}', [AcademicYearController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-years.show');
+    Route::match(['PUT', 'PATCH'], 'academic-years/{academicYear}', [AcademicYearController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-years.update');
+    Route::delete('academic-years/{academicYear}', [AcademicYearController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-years.destroy');
+
+    Route::get('academic-sessions', [AcademicSessionController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-sessions.index');
+    Route::post('academic-sessions', [AcademicSessionController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-sessions.store');
+    Route::get('academic-sessions/{academicSession}', [AcademicSessionController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-sessions.show');
+    Route::match(['PUT', 'PATCH'], 'academic-sessions/{academicSession}', [AcademicSessionController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-sessions.update');
+    Route::delete('academic-sessions/{academicSession}', [AcademicSessionController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('academic-sessions.destroy');
 
     Route::get('staff', [StaffController::class, 'index'])
         ->middleware('role:admin')

@@ -2,41 +2,53 @@
 
 namespace App\Http\Controllers\ExamBodies;
 
+use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ExamBodies\StoreExamBodyRequest;
 use App\Http\Requests\ExamBodies\UpdateExamBodyRequest;
 use App\Http\Resources\ExamBodies\ExamBodyResource;
 use App\Models\ExamBody;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class ExamBodyController extends Controller
 {
+    use PaginatesLists;
+
     /**
-     * List exam bodies, ordered by name, optionally filtered by search.
-     *
-     * The certification level picker searches this endpoint, so a single
-     * capped page of matches is ever returned.
+     * List exam bodies ordered by name, with the shared search / sort /
+     * pagination contract. The certification level picker searches this
+     * endpoint, so it uses the same `search` parameter as the table.
      */
     public function index(Request $request): JsonResponse
     {
-        $search = trim((string) $request->query('search', ''));
-        $like = '%'.addcslashes($search, '%_\\').'%';
+        $filters = $request->validate([
+            'is_active' => ['nullable', 'boolean'],
+        ]);
 
-        $examBodies = ExamBody::query()
-            ->when($search !== '', function ($query) use ($like) {
-                $query->where(function ($query) use ($like) {
-                    $query->where('name', 'like', $like)
-                        ->orWhere('code', 'like', $like);
-                });
-            })
-            ->orderBy('name')
-            ->limit(50)
-            ->get();
+        $paginator = $this->paginateList(
+            $request,
+            ExamBody::query(),
+            searchable: ['name', 'code'],
+            sortable: [
+                'name' => 'name',
+                'code' => 'code',
+                'is_active' => 'is_active',
+                'created_at' => 'created_at',
+            ],
+            defaultOrder: [['name', 'asc']],
+            applyFilters: function (Builder $query) use ($filters): void {
+                if (array_key_exists('is_active', $filters) && $filters['is_active'] !== null) {
+                    $query->where('is_active', (bool) $filters['is_active']);
+                }
+            },
+        );
 
         return response()->json([
-            'exam_bodies' => ExamBodyResource::collection($examBodies),
+            'exam_bodies' => ExamBodyResource::collection($paginator->items()),
+            'meta' => $this->listMeta($paginator),
         ]);
     }
 

@@ -26,10 +26,6 @@ export function setAccessToken(token) {
   accessToken = token
 }
 
-export function getAccessToken() {
-  return accessToken
-}
-
 let refreshPromise = null
 
 /**

@@ -33,7 +33,7 @@ export default function DepartmentForm() {
   // so this stays fast even with hundreds of thousands of users.
   const searchUsers = useCallback(async (search, signal) => {
     const { data } = await api.get('/users', {
-      params: search ? { search } : {},
+      params: { per_page: 100, ...(search ? { search } : {}) },
       signal,
     })
 

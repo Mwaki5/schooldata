@@ -2,21 +2,27 @@
 
 namespace App\Http\Controllers\Staff;
 
+use App\Enums\Role;
+use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Staff\StoreStaffRequest;
 use App\Http\Requests\Staff\UpdateStaffRequest;
 use App\Http\Resources\Staff\StaffResource;
 use App\Models\Staff;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class StaffController extends Controller
 {
+    use PaginatesLists;
+
     /**
      * The identity keys of the staff payload: stored on the user account.
      *
@@ -44,26 +50,42 @@ class StaffController extends Controller
     ];
 
     /**
-     * List every staff member, optionally filtered by name or number.
+     * List staff members ordered by employment number, with the shared
+     * search / sort / pagination contract and both relations loaded.
      */
     public function index(Request $request): JsonResponse
     {
-        $search = $request->string('search')->toString();
+        $filters = $request->validate([
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'employment_status' => ['nullable', 'string', 'max:50'],
+            'employment_type' => ['nullable', 'string', 'max:50'],
+            'role' => ['nullable', Rule::enum(Role::class)],
+        ]);
 
-        $staff = Staff::with(['department', 'user'])
-            ->when($search, function ($query, $search) {
-                $like = '%'.$search.'%';
-
-                $query->where(function ($query) use ($like) {
-                    $query->where('name', 'like', $like)
-                        ->orWhere('employment_no', 'like', $like);
-                });
-            })
-            ->orderBy('employment_no')
-            ->get();
+        $paginator = $this->paginateList(
+            $request,
+            Staff::query()->with(['department', 'user']),
+            searchable: ['name', 'employment_no'],
+            sortable: [
+                'name' => 'name',
+                'employment_no' => 'employment_no',
+                'employment_status' => 'employment_status',
+                'date_joined' => 'date_joined',
+                'created_at' => 'created_at',
+            ],
+            defaultOrder: [['employment_no', 'asc']],
+            applyFilters: function (Builder $query) use ($filters): void {
+                $query
+                    ->when($filters['department_id'] ?? null, fn ($query, $departmentId) => $query->where('department_id', $departmentId))
+                    ->when($filters['employment_status'] ?? null, fn ($query, $status) => $query->where('employment_status', $status))
+                    ->when($filters['employment_type'] ?? null, fn ($query, $type) => $query->where('employment_type', $type))
+                    ->when($filters['role'] ?? null, fn ($query, $role) => $query->where('role', $role));
+            },
+        );
 
         return response()->json([
-            'staff' => StaffResource::collection($staff),
+            'staff' => StaffResource::collection($paginator->items()),
+            'meta' => $this->listMeta($paginator),
         ]);
     }
 
@@ -108,6 +130,7 @@ class StaffController extends Controller
     public function update(UpdateStaffRequest $request, Staff $staff): JsonResponse
     {
         $validated = $request->validated();
+        $staff->load('user');
         $name = $this->composeName($validated, $staff->user);
 
         $staff->update([
@@ -131,7 +154,7 @@ class StaffController extends Controller
      */
     public function destroy(Staff $staff): Response
     {
-        $user = $staff->user;
+        $user = $staff->load('user')->user;
 
         $staff->update(['user_id' => null]);
         $staff->delete();
@@ -207,6 +230,8 @@ class StaffController extends Controller
      */
     private function syncAccount(Staff $staff, array $validated, string $name): ?string
     {
+        $staff->loadMissing('user');
+
         $user = $staff->user
             ?? User::withTrashed()->where('login_id', $validated['employment_no'] ?? $staff->employment_no)->first();
 

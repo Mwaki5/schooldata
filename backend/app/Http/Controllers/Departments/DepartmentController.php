@@ -2,31 +2,51 @@
 
 namespace App\Http\Controllers\Departments;
 
+use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Departments\StoreDepartmentRequest;
 use App\Http\Requests\Departments\UpdateDepartmentRequest;
 use App\Http\Resources\Departments\DepartmentResource;
 use App\Models\Department;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class DepartmentController extends Controller
 {
+    use PaginatesLists;
+
     /**
-     * List every department, ordered by name.
+     * List departments ordered by name, with the shared search / sort /
+     * pagination contract, the head of department eagerly loaded.
      */
     public function index(Request $request): JsonResponse
     {
-        $search = $request->string('search')->toString();
+        $filters = $request->validate([
+            'is_active' => ['nullable', 'boolean'],
+        ]);
 
-        $departments = Department::with('hod')
-            ->when($search, fn ($query, $search) => $query->where('name', 'like', '%'.$search.'%'))
-            ->orderBy('name')
-            ->get();
+        $paginator = $this->paginateList(
+            $request,
+            Department::query()->with('hod'),
+            searchable: ['name'],
+            sortable: [
+                'name' => 'name',
+                'is_active' => 'is_active',
+                'created_at' => 'created_at',
+            ],
+            defaultOrder: [['name', 'asc']],
+            applyFilters: function (Builder $query) use ($filters): void {
+                if (array_key_exists('is_active', $filters) && $filters['is_active'] !== null) {
+                    $query->where('is_active', (bool) $filters['is_active']);
+                }
+            },
+        );
 
         return response()->json([
-            'departments' => DepartmentResource::collection($departments),
+            'departments' => DepartmentResource::collection($paginator->items()),
+            'meta' => $this->listMeta($paginator),
         ]);
     }
 

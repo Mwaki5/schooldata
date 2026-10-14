@@ -243,7 +243,7 @@ export default function StaffForm() {
           <form onSubmit={handleSubmit} className="space-y-8" noValidate>
             <div className="space-y-5">
               <SectionTitle>Identity</SectionTitle>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-3">
                 <FormField
                   id="employment_no"
                   label="Employee No"
@@ -341,7 +341,7 @@ export default function StaffForm() {
 
             <div className="space-y-5">
               <SectionTitle>Personal Details</SectionTitle>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-3">
                 <FormField
                   id="gender"
                   label="Gender"
@@ -515,7 +515,7 @@ export default function StaffForm() {
 
             <div className="space-y-5">
               <SectionTitle>Contact</SectionTitle>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-3">
                 <FormField
                   id="work_email"
                   label="Work Email"
@@ -542,7 +542,7 @@ export default function StaffForm() {
 
             <div className="space-y-5">
               <SectionTitle>Employment</SectionTitle>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-3">
                 <FormField
                   id="role"
                   label="Role"
@@ -591,7 +591,7 @@ export default function StaffForm() {
                     fetchOptions={(query, signal) =>
                       api
                         .get('/departments', {
-                          params: query ? { search: query } : {},
+                          params: { per_page: 100, ...(query ? { search: query } : {}) },
                           signal,
                         })
                         .then(({ data }) =>
@@ -674,7 +674,7 @@ export default function StaffForm() {
 
             <div className="space-y-5">
               <SectionTitle>Compensation & Qualifications</SectionTitle>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-3">
                 <FormField
                   id="basic_salary"
                   label="Basic Salary"
@@ -714,7 +714,7 @@ export default function StaffForm() {
 
             <div className="space-y-5">
               <SectionTitle>Termination</SectionTitle>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 lg:grid-cols-3">
                 <FormField
                   id="termination_date"
                   label="Termination Date"
