@@ -32,6 +32,9 @@
         <env name="JWT_TTL" value="15"/>
         <env name="JWT_REFRESH_TTL" value="10080"/>
         <env name="JWT_BLACKLIST_GRACE_PERIOD" value="0"/>
+        <!-- Fixed test-only signing secret: without it every token-issuing
+             test fails with "Secret is not set." on a fresh checkout. -->
+        <env name="JWT_SECRET" value="testing-only-signing-secret-0f4c2b9e7a1d4836b5c0e2f8a6d31947"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
