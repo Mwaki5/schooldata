@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class AcademicSessionController extends Controller
 {
@@ -57,15 +58,29 @@ class AcademicSessionController extends Controller
     }
 
     /**
-     * Create a new academic session, stamping the creating user.
+     * Create a new academic session, stamping the creating user. Only one
+     * session may be active at a time, so activating this one retires the
+     * others.
      */
     public function store(StoreAcademicSessionRequest $request): JsonResponse
     {
-        $academicSession = AcademicSession::create([
-            ...$request->validated(),
-            'created_by' => $request->user()->id,
-            'updated_by' => $request->user()->id,
-        ]);
+        $academicSession = DB::transaction(function () use ($request): AcademicSession {
+            // Lock every session row so concurrent activations serialise
+            // and can never leave two (or zero) active sessions behind.
+            AcademicSession::query()->lockForUpdate()->get();
+
+            $academicSession = AcademicSession::create([
+                ...$request->validated(),
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
+            ]);
+
+            if ($academicSession->is_active) {
+                $this->deactivateOtherSessions($academicSession, $request->user()->id);
+            }
+
+            return $academicSession;
+        });
 
         return response()->json([
             'academic_session' => new AcademicSessionResource(
@@ -88,13 +103,23 @@ class AcademicSessionController extends Controller
 
     /**
      * Update an existing academic session, stamping the updating user.
+     * Only one session may be active at a time, so activating this one
+     * retires the others.
      */
     public function update(UpdateAcademicSessionRequest $request, AcademicSession $academicSession): JsonResponse
     {
-        $academicSession->update([
-            ...$request->validated(),
-            'updated_by' => $request->user()->id,
-        ]);
+        DB::transaction(function () use ($request, $academicSession): void {
+            AcademicSession::query()->lockForUpdate()->get();
+
+            $academicSession->update([
+                ...$request->validated(),
+                'updated_by' => $request->user()->id,
+            ]);
+
+            if ($academicSession->is_active) {
+                $this->deactivateOtherSessions($academicSession, $request->user()->id);
+            }
+        });
 
         return response()->json([
             'academic_session' => new AcademicSessionResource(
@@ -111,5 +136,20 @@ class AcademicSessionController extends Controller
         $academicSession->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Keep at most one active academic session: activating this one turns
+     * every other session off, stamped with the acting user.
+     */
+    private function deactivateOtherSessions(AcademicSession $academicSession, int $userId): void
+    {
+        AcademicSession::query()
+            ->whereKeyNot($academicSession->id)
+            ->where('is_active', true)
+            ->update([
+                'is_active' => false,
+                'updated_by' => $userId,
+            ]);
     }
 }

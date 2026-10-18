@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AcademicSession;
 use App\Models\AcademicYear;
 use App\Models\User;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -238,4 +239,104 @@ test('a missing academic year returns 404', function () {
     $this->withToken(academicYearsAccessTokenFor(User::factory()->create()))
         ->getJson('/api/academic-years/999')
         ->assertNotFound();
+});
+
+test('activating a new academic year automatically retires the active one', function () {
+    $user = User::factory()->create();
+    AcademicYear::factory()->create(['name' => '2025/2026', 'is_active' => true]);
+
+    $this->withToken(academicYearsAccessTokenFor($user))
+        ->postJson('/api/academic-years', [
+            'name' => '2026/2027',
+            'start_date' => '2026-09-01',
+            'end_date' => '2027-06-30',
+            'is_active' => true,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('academic_year.is_active', true);
+
+    $this->assertDatabaseHas('academic_years', ['name' => '2025/2026', 'is_active' => false])
+        ->assertDatabaseHas('academic_years', ['name' => '2026/2027', 'is_active' => true]);
+});
+
+test('updating a year to active deactivates the other active year', function () {
+    $user = User::factory()->create();
+    AcademicYear::factory()->create(['name' => '2025/2026', 'is_active' => true]);
+    $year = AcademicYear::factory()->create(['name' => '2026/2027', 'is_active' => false]);
+
+    $this->withToken(academicYearsAccessTokenFor($user))
+        ->putJson('/api/academic-years/'.$year->id, [
+            'name' => '2026/2027',
+            'is_active' => true,
+        ])
+        ->assertOk()
+        ->assertJsonPath('academic_year.is_active', true);
+
+    $this->assertDatabaseHas('academic_years', ['name' => '2025/2026', 'is_active' => false])
+        ->assertDatabaseHas('academic_years', ['name' => '2026/2027', 'is_active' => true]);
+});
+
+test('saving a year as inactive leaves the active year untouched', function () {
+    $user = User::factory()->create();
+    AcademicYear::factory()->create(['name' => '2025/2026', 'is_active' => true]);
+    $year = AcademicYear::factory()->create(['name' => '2026/2027', 'is_active' => false]);
+
+    $this->withToken(academicYearsAccessTokenFor($user))
+        ->putJson('/api/academic-years/'.$year->id, [
+            'name' => '2026/2027',
+            'is_active' => false,
+        ])
+        ->assertOk()
+        ->assertJsonPath('academic_year.is_active', false);
+
+    $this->assertDatabaseHas('academic_years', ['name' => '2025/2026', 'is_active' => true])
+        ->assertDatabaseHas('academic_years', ['name' => '2026/2027', 'is_active' => false]);
+});
+
+test('an academic year cannot start after its existing sessions', function () {
+    $user = User::factory()->create();
+    $year = AcademicYear::factory()->create([
+        'name' => '2026/2027',
+        'start_date' => '2026-01-01',
+        'end_date' => '2026-12-31',
+    ]);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-15',
+    ]);
+
+    $this->withToken(academicYearsAccessTokenFor($user))
+        ->putJson('/api/academic-years/'.$year->id, [
+            'name' => '2026/2027',
+            'start_date' => '2026-09-02',
+            'end_date' => '2026-12-31',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date']);
+});
+
+test('an academic year cannot end before its existing sessions', function () {
+    $user = User::factory()->create();
+    $year = AcademicYear::factory()->create([
+        'name' => '2026/2027',
+        'start_date' => '2026-01-01',
+        'end_date' => '2026-12-31',
+    ]);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 3 2026',
+        'start_date' => '2026-04-20',
+        'end_date' => '2026-08-25',
+    ]);
+
+    $this->withToken(academicYearsAccessTokenFor($user))
+        ->putJson('/api/academic-years/'.$year->id, [
+            'name' => '2026/2027',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-08-24',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
 });

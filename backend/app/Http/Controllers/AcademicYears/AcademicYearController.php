@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class AcademicYearController extends Controller
 {
@@ -53,15 +54,28 @@ class AcademicYearController extends Controller
     }
 
     /**
-     * Create a new academic year, stamping the creating user.
+     * Create a new academic year, stamping the creating user. Only one
+     * year may be active, so activating this one retires the others.
      */
     public function store(StoreAcademicYearRequest $request): JsonResponse
     {
-        $academicYear = AcademicYear::create([
-            ...$request->validated(),
-            'created_by' => $request->user()->id,
-            'updated_by' => $request->user()->id,
-        ]);
+        $academicYear = DB::transaction(function () use ($request): AcademicYear {
+            // Lock every year row so concurrent activations serialise and
+            // can never leave two (or zero) active years behind.
+            AcademicYear::query()->lockForUpdate()->get();
+
+            $academicYear = AcademicYear::create([
+                ...$request->validated(),
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
+            ]);
+
+            if ($academicYear->is_active) {
+                $this->deactivateOtherYears($academicYear, $request->user()->id);
+            }
+
+            return $academicYear;
+        });
 
         return response()->json([
             'academic_year' => new AcademicYearResource($academicYear),
@@ -79,14 +93,23 @@ class AcademicYearController extends Controller
     }
 
     /**
-     * Update an existing academic year, stamping the updating user.
+     * Update an existing academic year, stamping the updating user. Only
+     * one year may be active, so activating this one retires the others.
      */
     public function update(UpdateAcademicYearRequest $request, AcademicYear $academicYear): JsonResponse
     {
-        $academicYear->update([
-            ...$request->validated(),
-            'updated_by' => $request->user()->id,
-        ]);
+        DB::transaction(function () use ($request, $academicYear): void {
+            AcademicYear::query()->lockForUpdate()->get();
+
+            $academicYear->update([
+                ...$request->validated(),
+                'updated_by' => $request->user()->id,
+            ]);
+
+            if ($academicYear->is_active) {
+                $this->deactivateOtherYears($academicYear, $request->user()->id);
+            }
+        });
 
         return response()->json([
             'academic_year' => new AcademicYearResource($academicYear->refresh()),
@@ -101,5 +124,20 @@ class AcademicYearController extends Controller
         $academicYear->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * Keep at most one active academic year: activating this one turns
+     * every other year off, stamped with the acting user.
+     */
+    private function deactivateOtherYears(AcademicYear $academicYear, int $userId): void
+    {
+        AcademicYear::query()
+            ->whereKeyNot($academicYear->id)
+            ->where('is_active', true)
+            ->update([
+                'is_active' => false,
+                'updated_by' => $userId,
+            ]);
     }
 }

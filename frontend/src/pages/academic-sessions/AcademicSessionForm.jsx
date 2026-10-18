@@ -225,6 +225,7 @@ export default function AcademicSessionForm() {
                 label="Start Date"
                 name="start_date"
                 type="date"
+                required
                 defaultValue={session?.start_date ?? ''}
                 error={errors.start_date}
               />
@@ -234,6 +235,7 @@ export default function AcademicSessionForm() {
                 label="End Date"
                 name="end_date"
                 type="date"
+                required
                 defaultValue={session?.end_date ?? ''}
                 error={errors.end_date}
               />
@@ -252,6 +254,11 @@ export default function AcademicSessionForm() {
                   />
                   Academic session is currently active
                 </label>
+                <p className="text-xs text-muted-foreground">
+                  Only one academic session can be active at a time —
+                  activating this one retires the others. Dates must sit
+                  inside the academic year and never overlap another session.
+                </p>
               </div>
             </div>
 

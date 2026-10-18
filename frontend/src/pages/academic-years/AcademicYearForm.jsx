@@ -183,6 +183,10 @@ export default function AcademicYearForm() {
                   />
                   Academic year is currently active
                 </label>
+                <p className="text-xs text-muted-foreground">
+                  Only one academic year can be active at a time — activating
+                  this one retires the others.
+                </p>
               </div>
             </div>
 

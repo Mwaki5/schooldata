@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests\AcademicSessions;
 
+use App\Http\Requests\AcademicSessions\Concerns\ValidatesSessionScheduling;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdateAcademicSessionRequest extends FormRequest
 {
+    use ValidatesSessionScheduling;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -31,8 +34,8 @@ class UpdateAcademicSessionRequest extends FormRequest
                 'max:255',
                 Rule::unique('academic_sessions', 'name')->ignore($this->route('academicSession')->id),
             ],
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'description' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
         ];

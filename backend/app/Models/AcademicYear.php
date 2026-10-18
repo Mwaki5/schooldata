@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\AcademicYearFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -49,6 +50,14 @@ class AcademicYear extends Model
             'end_date' => 'date',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * The academic sessions scheduled under this year.
+     */
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(AcademicSession::class);
     }
 
     /**

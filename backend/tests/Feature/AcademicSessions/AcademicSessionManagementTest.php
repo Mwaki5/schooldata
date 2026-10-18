@@ -80,7 +80,7 @@ test('the academic session list supports year filters, sorting and pagination', 
 
 test('an academic session can be created with audit stamps', function () {
     $creator = User::factory()->create();
-    $year = AcademicYear::factory()->create();
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
 
     $response = $this->withToken(academicSessionsAccessTokenFor($creator))
         ->postJson('/api/academic-sessions', [
@@ -110,27 +110,39 @@ test('an academic session can be created with audit stamps', function () {
     ]);
 });
 
-test('an academic session defaults to inactive and tolerates null dates', function () {
+test('an academic session defaults to inactive', function () {
     $user = User::factory()->create();
-    $year = AcademicYear::factory()->create();
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
 
     $this->withToken(academicSessionsAccessTokenFor($user))
         ->postJson('/api/academic-sessions', [
             'academic_year_id' => $year->id,
             'name' => 'Term 2 2026',
+            'start_date' => '2026-04-20',
+            'end_date' => '2026-08-25',
         ])
         ->assertCreated()
         ->assertJsonPath('academic_session.is_active', false)
-        ->assertJsonPath('academic_session.start_date', null)
-        ->assertJsonPath('academic_session.end_date', null)
         ->assertJsonPath('academic_session.description', null);
+});
+
+test('creating an academic session requires start and end dates', function () {
+    $year = AcademicYear::factory()->create();
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 2 2026',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date', 'end_date']);
 });
 
 test('creating an academic session requires a name and an academic year', function () {
     $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
         ->postJson('/api/academic-sessions', [])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['academic_year_id', 'name']);
+        ->assertJsonValidationErrors(['academic_year_id', 'name', 'start_date', 'end_date']);
 });
 
 test('the academic year must exist', function () {
@@ -193,7 +205,7 @@ test('an academic session can be updated and stamps the updating user', function
     $creator = User::factory()->create();
     $updater = User::factory()->create();
     $oldYear = AcademicYear::factory()->create();
-    $newYear = AcademicYear::factory()->create();
+    $newYear = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
     $session = AcademicSession::factory()->create([
         'academic_year_id' => $oldYear->id,
         'is_active' => false,
@@ -228,20 +240,26 @@ test('an academic session can be updated and stamps the updating user', function
 });
 
 test('updating an academic session validates its name excluding itself', function () {
-    $year = AcademicYear::factory()->create();
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
     $session = AcademicSession::factory()->create([
         'academic_year_id' => $year->id,
         'name' => 'Term 1 2026',
+        'start_date' => '2026-01-05',
+        'end_date' => '2026-04-10',
     ]);
     AcademicSession::factory()->create([
         'academic_year_id' => $year->id,
         'name' => 'Term 2 2026',
+        'start_date' => '2026-04-20',
+        'end_date' => '2026-08-25',
     ]);
 
     $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
         ->putJson('/api/academic-sessions/'.$session->id, [
             'academic_year_id' => $year->id,
             'name' => 'Term 2 2026',
+            'start_date' => '2026-01-05',
+            'end_date' => '2026-04-10',
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['name']);
@@ -250,6 +268,8 @@ test('updating an academic session validates its name excluding itself', functio
         ->putJson('/api/academic-sessions/'.$session->id, [
             'academic_year_id' => $year->id,
             'name' => 'Term 1 2026',
+            'start_date' => '2026-01-05',
+            'end_date' => '2026-04-10',
         ])
         ->assertOk();
 });
@@ -296,4 +316,232 @@ test('a missing academic session returns 404', function () {
     $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
         ->getJson('/api/academic-sessions/999')
         ->assertNotFound();
+});
+
+test('a session must start on or after its academic year', function () {
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 1 2026',
+            'start_date' => '2025-09-01',
+            'end_date' => '2025-12-15',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date']);
+});
+
+test('a session must end on or before its academic year', function () {
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 3 2026',
+            'start_date' => '2026-09-01',
+            'end_date' => '2027-03-30',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['end_date']);
+});
+
+test('sessions cannot be scheduled under an academic year without dates', function () {
+    $year = AcademicYear::factory()->create(['start_date' => null, 'end_date' => null]);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 1 2026',
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-12-15',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['academic_year_id']);
+});
+
+test('sessions cannot overlap within the same academic year', function () {
+    $year = AcademicYear::factory()->create(['start_date' => '2025-09-01', 'end_date' => '2027-06-30']);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-15',
+    ]);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 2 2026',
+            'start_date' => '2026-12-01',
+            'end_date' => '2027-03-30',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date']);
+});
+
+test('sessions may not share a boundary day', function () {
+    $year = AcademicYear::factory()->create(['start_date' => '2025-09-01', 'end_date' => '2027-06-30']);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-15',
+    ]);
+
+    // Term 2 starts on the very day Term 1 ends — dates are inclusive, so
+    // that day would belong to both sessions.
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 2 2026',
+            'start_date' => '2026-12-15',
+            'end_date' => '2027-03-30',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date']);
+});
+
+test('a session may start the day after another ends', function () {
+    $year = AcademicYear::factory()->create(['start_date' => '2025-09-01', 'end_date' => '2027-06-30']);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-15',
+    ]);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 2 2026',
+            'start_date' => '2026-12-16',
+            'end_date' => '2027-03-30',
+        ])
+        ->assertCreated();
+});
+
+test('overlaps are only checked against sessions of the same academic year', function () {
+    $yearA = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    $yearB = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+
+    AcademicSession::factory()->create([
+        'academic_year_id' => $yearA->id,
+        'name' => 'Term 1 (Year A)',
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-15',
+    ]);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $yearB->id,
+            'name' => 'Term 1 (Year B)',
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-12-15',
+        ])
+        ->assertCreated();
+});
+
+test('updating a session excludes itself from the overlap check', function () {
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    $session = AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-15',
+    ]);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->putJson('/api/academic-sessions/'.$session->id, [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 1 2026 (revised)',
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-12-15',
+        ])
+        ->assertOk();
+});
+
+test('moving a session into another session dates is rejected', function () {
+    $year = AcademicYear::factory()->create(['start_date' => '2025-09-01', 'end_date' => '2027-06-30']);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-15',
+    ]);
+    $session = AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 2 2026',
+        'start_date' => '2027-01-05',
+        'end_date' => '2027-03-30',
+    ]);
+
+    $this->withToken(academicSessionsAccessTokenFor(User::factory()->create()))
+        ->putJson('/api/academic-sessions/'.$session->id, [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 2 2026',
+            'start_date' => '2026-09-15',
+            'end_date' => '2026-12-01',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['start_date']);
+});
+
+test('activating a session deactivates the previously active session', function () {
+    $user = User::factory()->create();
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-01-05',
+        'end_date' => '2026-04-10',
+        'is_active' => true,
+    ]);
+
+    $this->withToken(academicSessionsAccessTokenFor($user))
+        ->postJson('/api/academic-sessions', [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 2 2026',
+            'start_date' => '2026-04-20',
+            'end_date' => '2026-08-25',
+            'is_active' => true,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('academic_session.is_active', true);
+
+    $this->assertDatabaseHas('academic_sessions', ['name' => 'Term 1 2026', 'is_active' => false])
+        ->assertDatabaseHas('academic_sessions', ['name' => 'Term 2 2026', 'is_active' => true]);
+});
+
+test('updating a session to active deactivates the other active session', function () {
+    $user = User::factory()->create();
+    $year = AcademicYear::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-01-05',
+        'end_date' => '2026-04-10',
+        'is_active' => true,
+    ]);
+    $session = AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 2 2026',
+        'start_date' => '2026-04-20',
+        'end_date' => '2026-08-25',
+        'is_active' => false,
+    ]);
+
+    $this->withToken(academicSessionsAccessTokenFor($user))
+        ->putJson('/api/academic-sessions/'.$session->id, [
+            'academic_year_id' => $year->id,
+            'name' => 'Term 2 2026',
+            'start_date' => '2026-04-20',
+            'end_date' => '2026-08-25',
+            'is_active' => true,
+        ])
+        ->assertOk()
+        ->assertJsonPath('academic_session.is_active', true);
+
+    $this->assertDatabaseHas('academic_sessions', ['name' => 'Term 1 2026', 'is_active' => false])
+        ->assertDatabaseHas('academic_sessions', ['name' => 'Term 2 2026', 'is_active' => true]);
 });
