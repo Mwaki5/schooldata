@@ -1,12 +1,18 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
 } from '@/components/ui/card'
+import { ListPagination } from '@/components/list-pagination'
+import { ListSearch } from '@/components/list-search'
+import { SortableTh } from '@/components/sortable-th'
+import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -26,20 +32,25 @@ function StatusBadge({ active }) {
 }
 
 export default function Departments() {
-  const [departments, setDepartments] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
-  useEffect(() => {
-    api
-      .get('/departments')
-      .then(({ data }) => setDepartments(data.departments))
-      .catch(() =>
-        setLoadError('Unable to load departments. Please try again.'),
-      )
-      .finally(() => setLoading(false))
-  }, [])
+  const {
+    items: departments,
+    meta,
+    loading,
+    loadError,
+    search,
+    setSearch,
+    goToPage,
+    sort,
+    order,
+    toggleSort,
+    refresh,
+  } = useList({
+    resource: 'departments',
+    endpoint: '/departments',
+    errorMessage: 'Unable to load departments. Please try again.',
+  })
 
   const handleDelete = async (department) => {
     if (!window.confirm(`Delete the "${department.name}" department?`)) {
@@ -51,9 +62,7 @@ export default function Departments() {
     try {
       await api.delete(`/departments/${department.id}`)
 
-      setDepartments((current) =>
-        current.filter((item) => item.id !== department.id),
-      )
+      refresh()
       toast.success(`Deleted "${department.name}"`)
     } catch {
       toast.error(
@@ -63,6 +72,9 @@ export default function Departments() {
       setDeletingId(null)
     }
   }
+
+  /** Row numbers keep counting across pages, not per page. */
+  const rowOffset = meta ? (meta.current_page - 1) * meta.per_page : 0
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -91,47 +103,72 @@ export default function Departments() {
       )}
 
       <Card>
-        <CardContent>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle>All Departments</CardTitle>
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search departments…"
+          />
+        </CardHeader>
+        <CardContent className="space-y-4">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : departments.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No departments yet. Create the first one with the button above.
+              {search
+                ? `No departments match “${search}”.`
+                : 'No departments yet. Create the first one with the button above.'}
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="py-1 px-2 font-medium">#</th>
-                  <th className="py-1 font-medium">Department</th>
-                  <th className="py-1 font-medium">HOD</th>
-                  <th className="py-1 font-medium">Status</th>
-                  <th className="py-1 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {departments.map((department,idx) => (
-                  <tr key={department.id}>
-                    <td className="py-1 px-2 text-muted-foreground">{idx+1}</td>
-                    <td className="py-1 text-muted-foreground">{department.name}</td>
-                    <td className="py-1 text-muted-foreground">
-                      {department.hod_name ?? '—'}
-                    </td>
-                    <td className="py-1">
-                      <StatusBadge active={department.is_active} />
-                    </td>
-                    <td className="py-1">
-                      <div className="flex items-center justify-end gap-2 ">
-                        <Link
-                          to={`/departments/${department.id}/edit`}
-                          className={buttonVariants({
-                            variant: 'ghost',
-                            size: 'sm',
-                          })}
-                        >
-                          <Pencil className=' text-muted-foreground' aria-hidden="true" />
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-1 px-2 font-medium">#</th>
+                    <SortableTh
+                      column="name"
+                      label="Department"
+                      sort={sort}
+                      order={order}
+                      onSort={toggleSort}
+                      className="py-1"
+                    />
+                    <th className="py-1 font-medium">HOD</th>
+                    <SortableTh
+                      column="is_active"
+                      label="Status"
+                      sort={sort}
+                      order={order}
+                      onSort={toggleSort}
+                      className="py-1"
+                    />
+                    <th className="py-1 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {departments.map((department,idx) => (
+                    <tr key={department.id}>
+                      <td className="py-1 px-2 text-muted-foreground">{rowOffset + idx + 1}</td>
+                      <td className="py-1 text-muted-foreground">{department.name}</td>
+                      <td className="py-1 text-muted-foreground">
+                        {department.hod_name ?? '—'}
+                      </td>
+                      <td className="py-1">
+                        <StatusBadge active={department.is_active} />
+                      </td>
+                      <td className="py-1">
+                        <div className="flex items-center justify-end gap-2 ">
+                          <Link
+                            to={`/departments/${department.id}/edit`}
+                            className={buttonVariants({
+                              variant: 'ghost',
+                              size: 'sm',
+                            })}
+                          >
+                            <Pencil className=' text-muted-foreground' aria-hidden="true" />
                          <span className=' text-muted-foreground'> Edit</span>
-                        </Link>
+                          </Link>
                         <button className='flex items-center justify-end gap-2 '
                           disabled={deletingId === department.id}
                           onClick={() => handleDelete(department)}
@@ -141,11 +178,19 @@ export default function Departments() {
 
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <ListPagination
+                meta={meta}
+                loading={loading}
+                onPageChange={goToPage}
+                label="departments"
+              />
+            </>
           )}
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FormField } from '@/components/form-field'
+import { PasswordInput } from '@/components/ui/password-input'
 import { useAuth } from '@/context/AuthContext'
 import { validationErrors } from '@/lib/api'
 
@@ -84,13 +85,17 @@ export default function Login() {
               <FormField
                 id="password"
                 label="Password"
-                type="password"
-                name="password"
                 required
-                autoComplete="current-password"
-                placeholder="Enter your password"
                 error={errors.password}
-              />
+              >
+                <PasswordInput
+                  id="password"
+                  name="password"
+                  required
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                />
+              </FormField>
 
               <Button
                 type="submit"

@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 export default function CertificationLevelForm() {
   const { levelId } = useParams()
@@ -43,10 +43,14 @@ export default function CertificationLevelForm() {
             : null)
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the certification level. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Certification level',
+              'Unable to load the certification level. It may have been deleted.',
+            ),
           )
         }
       })
@@ -153,7 +157,7 @@ export default function CertificationLevelForm() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5" noValidate key={formKey}>
             {/* Small screens: one input per row; sm and up: two per row. */}
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-5 lg:grid-cols-2">
               {/* Exam Body with SearchableSelect */}
               <FormField
                 id="exam_body_id"
@@ -172,7 +176,7 @@ export default function CertificationLevelForm() {
                   fetchOptions={(query, signal) =>
                     api
                       .get('/exam-bodies', {
-                        params: query ? { search: query } : {},
+                        params: { per_page: 100, ...(query ? { search: query } : {}) },
                         signal,
                       })
                       .then(({ data }) =>

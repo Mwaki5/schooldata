@@ -17,10 +17,29 @@ const DepartmentForm = lazy(
 )
 const ExamBodies = lazy(() => import('@/pages/exam-bodies/ExamBodies'))
 const ExamBodyForm = lazy(() => import('@/pages/exam-bodies/ExamBodyForm'))
+const ExamBodyGrades = lazy(() => import('@/pages/exam-body-grades/ExamBodyGrades'))
+const ExamBodyGradeForm = lazy(() => import('@/pages/exam-body-grades/ExamBodyGradeForm'))
 const CertificationLevels = lazy(() => import('@/pages/certification-levels/CertificationLevels'))
 const CertificationLevelForm = lazy(() => import('@/pages/certification-levels/CertificationLevelForm'))
+const Curricula = lazy(() => import('@/pages/curricula/Curricula'))
+const CurriculumForm = lazy(() => import('@/pages/curricula/CurriculumForm'))
+const Courses = lazy(() => import('@/pages/courses/Courses'))
+const CourseForm = lazy(() => import('@/pages/courses/CourseForm'))
+const CourseUnits = lazy(() => import('@/pages/units/CourseUnits'))
+const Units = lazy(() => import('@/pages/units/Units'))
+const UnitForm = lazy(() => import('@/pages/units/UnitForm'))
+const UnitDetails = lazy(() => import('@/pages/units/UnitDetails'))
+const UnitAssignForm = lazy(() => import('@/pages/units/UnitAssignForm'))
+const CourseUnitForm = lazy(() => import('@/pages/units/CourseUnitForm'))
+const AcademicYears = lazy(() => import('@/pages/academic-years/AcademicYears'))
+const AcademicYearForm = lazy(() => import('@/pages/academic-years/AcademicYearForm'))
+const AcademicSessions = lazy(() => import('@/pages/academic-sessions/AcademicSessions'))
+const AcademicSessionForm = lazy(() => import('@/pages/academic-sessions/AcademicSessionForm'))
 const Staff = lazy(() => import('@/pages/staff/Staff'))
 const StaffForm = lazy(() => import('@/pages/staff/StaffForm'))
+const Students = lazy(() => import('@/pages/students/Students'))
+const StudentForm = lazy(() => import('@/pages/students/StudentForm'))
+const Enrolments = lazy(() => import('@/pages/enrolments/Enrolments'))
 const Activities = lazy(() => import('@/pages/activities/Activities'))
 
 function ProtectedRoute({ children }) {
@@ -129,15 +148,69 @@ export default function App() {
               path="/exam-bodies/:examBodyId/edit"
               element={<ExamBodyForm />}
             />
+            <Route path="/exam-body-grades" element={<ExamBodyGrades />} />
+            <Route path="/exam-body-grades/create" element={<ExamBodyGradeForm />} />
+            <Route
+              path="/exam-body-grades/:gradeId/edit"
+              element={<ExamBodyGradeForm />}
+            />
             <Route path="/certification-levels" element={<CertificationLevels />} />
             <Route path="/certification-levels/create" element={<CertificationLevelForm />} />
             <Route
               path="/certification-levels/:levelId/edit"
               element={<CertificationLevelForm />}
             />
+            <Route path="/curricula" element={<Curricula />} />
+            <Route path="/curricula/create" element={<CurriculumForm />} />
+            <Route
+              path="/curricula/:curriculumId/edit"
+              element={<CurriculumForm />}
+            />
+            <Route path="/courses" element={<Courses />} />
+            <Route path="/courses/create" element={<CourseForm />} />
+            <Route
+              path="/courses/:courseId/units"
+              element={<CourseUnits />}
+            />
+            <Route path="/courses/:courseId/edit" element={<CourseForm />} />
+            <Route path="/units" element={<Units />} />
+            <Route path="/units/create" element={<UnitForm />} />
+            <Route path="/units/assign" element={<UnitAssignForm />} />
+            <Route path="/units/:unitId" element={<UnitDetails />} />
+            <Route path="/units/:unitId/edit" element={<UnitForm />} />
+            <Route
+              path="/units/:unitId/assign"
+              element={<UnitAssignForm />}
+            />
+            <Route
+              path="/course-units/:courseUnitId/edit"
+              element={<CourseUnitForm />}
+            />
+            <Route path="/academic-years" element={<AcademicYears />} />
+            <Route path="/academic-years/create" element={<AcademicYearForm />} />
+            <Route
+              path="/academic-years/:yearId/edit"
+              element={<AcademicYearForm />}
+            />
+            <Route path="/academic-sessions" element={<AcademicSessions />} />
+            <Route
+              path="/academic-sessions/create"
+              element={<AcademicSessionForm />}
+            />
+            <Route
+              path="/academic-sessions/:sessionId/edit"
+              element={<AcademicSessionForm />}
+            />
             <Route path="/staff" element={<Staff />} />
             <Route path="/staff/create" element={<StaffForm />} />
             <Route path="/staff/:staffId/edit" element={<StaffForm />} />
+            <Route path="/students" element={<Students />} />
+            <Route path="/students/create" element={<StudentForm />} />
+            <Route
+              path="/students/:studentId/edit"
+              element={<StudentForm />}
+            />
+            <Route path="/enrolments" element={<Enrolments />} />
             <Route path="/activities" element={<Activities />} />
           </Route>
         </Route>

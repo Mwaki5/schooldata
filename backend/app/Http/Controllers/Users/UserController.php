@@ -2,38 +2,48 @@
 
 namespace App\Http\Controllers\Users;
 
+use App\Enums\Role;
+use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    use PaginatesLists;
+
     /**
-     * Search users for reference pickers (department HOD, class teacher, …).
-     *
-     * Only a single page of matches is ever returned so the endpoint stays
-     * fast with hundreds of thousands of users.
+     * Search users for reference pickers (department HOD, class teacher, …),
+     * with the shared search / sort / pagination contract.
      */
     public function index(Request $request): JsonResponse
     {
-        $search = trim((string) $request->query('search', ''));
-        $like = '%'.addcslashes($search, '%_\\').'%';
+        $filters = $request->validate([
+            'role' => ['nullable', Rule::enum(Role::class)],
+        ]);
 
-        $users = User::query()
-            ->when($search !== '', function ($query) use ($like) {
-                $query->where(function ($query) use ($like) {
-                    $query->where('name', 'like', $like)
-                        ->orWhere('email', 'like', $like);
-                });
-            })
-            ->orderBy('name')
-            ->limit(50)
-            ->get();
+        $paginator = $this->paginateList(
+            $request,
+            User::query(),
+            searchable: ['name', 'email', 'login_id'],
+            sortable: [
+                'name' => 'name',
+                'email' => 'email',
+                'created_at' => 'created_at',
+            ],
+            defaultOrder: [['name', 'asc']],
+            applyFilters: function (Builder $query) use ($filters): void {
+                $query->when($filters['role'] ?? null, fn ($query, $role) => $query->where('role', $role));
+            },
+        );
 
         return response()->json([
-            'users' => UserResource::collection($users),
+            'users' => UserResource::collection($paginator->items()),
+            'meta' => $this->listMeta($paginator),
         ]);
     }
 }

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FormField } from '@/components/form-field'
+import { PasswordInput } from '@/components/ui/password-input'
 import { useAuth } from '@/context/AuthContext'
 import { validationErrors } from '@/lib/api'
 
@@ -95,24 +96,32 @@ export default function Register() {
               <FormField
                 id="password"
                 label="Password"
-                type="password"
-                name="password"
                 required
-                autoComplete="new-password"
-                placeholder="Minimum 8 characters"
                 error={errors.password}
-              />
+              >
+                <PasswordInput
+                  id="password"
+                  name="password"
+                  required
+                  autoComplete="new-password"
+                  placeholder="Minimum 8 characters"
+                />
+              </FormField>
 
               <FormField
                 id="password_confirmation"
                 label="Confirm Password"
-                type="password"
-                name="password_confirmation"
                 required
-                autoComplete="new-password"
-                placeholder="Re-enter your password"
                 error={errors.password_confirmation}
-              />
+              >
+                <PasswordInput
+                  id="password_confirmation"
+                  name="password_confirmation"
+                  required
+                  autoComplete="new-password"
+                  placeholder="Re-enter your password"
+                />
+              </FormField>
 
               <Button
                 type="submit"

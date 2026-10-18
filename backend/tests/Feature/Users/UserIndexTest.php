@@ -42,19 +42,49 @@ test('the user list can be searched by name or email', function () {
     User::factory()->create(['name' => 'Ada King', 'email' => 'king@school.test']);
     User::factory()->create(['name' => 'Grace Hopper', 'email' => 'grace@school.test']);
 
-    $byName = $this->withToken(usersAccessTokenFor(User::factory()->create()))
+    $byName = $this->withToken(usersAccessTokenFor(User::factory()->create([
+        'name' => 'List Watcher',
+        'email' => 'watcher@school.test',
+    ])))
         ->getJson('/api/users?search=ada')
         ->assertOk()
         ->json('users');
 
     expect(collect($byName)->pluck('name')->all())->toBe(['Ada King', 'Ada Lovelace']);
 
-    $byEmail = $this->withToken(usersAccessTokenFor(User::factory()->create()))
+    $byEmail = $this->withToken(usersAccessTokenFor(User::factory()->create([
+        'name' => 'Mail Watcher',
+        'email' => 'mail-watcher@school.test',
+    ])))
         ->getJson('/api/users?search=grace@')
         ->assertOk()
         ->json('users');
 
     expect(collect($byEmail)->pluck('name')->all())->toBe(['Grace Hopper']);
+});
+
+test('the user list can be filtered by role and sorted descending', function () {
+    User::factory()->create(['name' => 'Ada Lovelace', 'role' => 'trainer']);
+    User::factory()->create(['name' => 'Grace Hopper', 'role' => 'admin']);
+
+    $token = usersAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/users?role=trainer')
+        ->assertOk()
+        ->assertJsonCount(1, 'users')
+        ->assertJsonPath('users.0.name', 'Ada Lovelace');
+
+    $sorted = $this->withToken($token)
+        ->getJson('/api/users?sort=email&order=desc')
+        ->assertOk();
+
+    $emails = collect($sorted->json('users'))->pluck('email')->all();
+
+    expect($emails)->toBe(collect($emails)->sortDesc()->values()->all())
+        ->and($sorted->json('meta.total'))->toBe(3);
+
+    $this->withToken($token)->getJson('/api/users?sort=password')->assertUnprocessable();
 });
 
 test('searching with no matches returns an empty list', function () {
@@ -66,12 +96,18 @@ test('searching with no matches returns an empty list', function () {
         ->assertJson(['users' => []]);
 });
 
-test('the user list is capped so huge datasets stay fast', function () {
+test('the user list paginates huge datasets so a single page stays fast', function () {
     User::factory()->count(60)->create();
 
-    $response = $this->withToken(usersAccessTokenFor(User::factory()->create()))
+    $token = usersAccessTokenFor(User::factory()->create());
+
+    $response = $this->withToken($token)
         ->getJson('/api/users')
         ->assertOk();
 
-    expect(count($response->json('users')))->toBe(50);
+    expect(count($response->json('users')))->toBe(20)
+        ->and($response->json('meta.total'))->toBe(61)
+        ->and($response->json('meta.last_page'))->toBe(4);
+
+    $this->withToken($token)->getJson('/api/users?per_page=500')->assertUnprocessable();
 });

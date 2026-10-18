@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 export default function ExamBodyForm() {
   const { examBodyId } = useParams()
@@ -41,10 +41,14 @@ export default function ExamBodyForm() {
           setExamBody(data.exam_body)
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the exam body. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Exam body',
+              'Unable to load the exam body. It may have been deleted.',
+            ),
           )
         }
       })
@@ -108,7 +112,7 @@ export default function ExamBodyForm() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <div
           role="alert"
           className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
@@ -127,7 +131,7 @@ export default function ExamBodyForm() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <Link
         to="/exam-bodies"
         className={buttonVariants({ variant: 'ghost' })}
@@ -150,7 +154,7 @@ export default function ExamBodyForm() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-5 lg:grid-cols-3">
               <FormField
                 id="code"
                 label="Code"

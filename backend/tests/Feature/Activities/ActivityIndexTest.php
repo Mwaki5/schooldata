@@ -74,7 +74,7 @@ test('the activity log requires an access token', function () {
 test('the activity log paginates newest first with a bounded page size', function () {
     $admin = User::factory()->create();
 
-    Department::factory()->count(16)->create();
+    Department::factory()->count(25)->create();
 
     $token = activityIndexAccessTokenFor($admin);
 
@@ -82,11 +82,11 @@ test('the activity log paginates newest first with a bounded page size', functio
 
     $firstPage->assertOk()
         ->assertJsonPath('meta.current_page', 1)
-        ->assertJsonPath('meta.per_page', 15)
-        ->assertJsonPath('meta.total', 16)
+        ->assertJsonPath('meta.per_page', 20)
+        ->assertJsonPath('meta.total', 25)
         ->assertJsonPath('meta.last_page', 2);
 
-    expect($firstPage->json('activities'))->toHaveCount(15);
+    expect($firstPage->json('activities'))->toHaveCount(20);
 
     $ids = $firstPage->json('activities.*.id');
     expect($ids)->toBe(collect($ids)->sortDesc()->all());
@@ -94,10 +94,45 @@ test('the activity log paginates newest first with a bounded page size', functio
     $secondPage = $this->withToken($token)->getJson('/api/activities?page=2');
 
     $secondPage->assertOk()->assertJsonPath('meta.current_page', 2);
-    expect($secondPage->json('activities'))->toHaveCount(1);
+    expect($secondPage->json('activities'))->toHaveCount(5);
 
     $this->withToken($token)->getJson('/api/activities?per_page=500')->assertUnprocessable();
-    $this->withToken($token)->getJson('/api/activities?per_page=2')->assertUnprocessable();
+    $this->withToken($token)->getJson('/api/activities?per_page=101')->assertUnprocessable();
+
+    $smallPage = $this->withToken($token)->getJson('/api/activities?per_page=2');
+
+    $smallPage->assertOk()->assertJsonPath('meta.per_page', 2);
+    expect($smallPage->json('activities'))->toHaveCount(2);
+});
+
+test('the activity log can be searched by description or user', function () {
+    $admin = User::factory()->create(['name' => 'Ada Lovelace']);
+
+    activity()->causedBy($admin)->event('review')->log('Reviewed records');
+    activity()->event('update')->log('Background sync finished');
+
+    $token = activityIndexAccessTokenFor($admin);
+
+    $byDescription = $this->withToken($token)
+        ->getJson('/api/activities?search=sync')
+        ->assertOk()
+        ->assertJsonCount(1, 'activities')
+        ->assertJsonPath('activities.0.description', 'Background sync finished');
+
+    $byUser = $this->withToken($token)
+        ->getJson('/api/activities?search=lovelace')
+        ->assertOk()
+        ->assertJsonCount(1, 'activities')
+        ->assertJsonPath('activities.0.causer_name', 'Ada Lovelace');
+
+    $sorted = $this->withToken($token)
+        ->getJson('/api/activities?sort=event&order=asc')
+        ->assertOk();
+
+    $events = collect($sorted->json('activities'))->pluck('event')->all();
+
+    expect($events)->toBe(collect($events)->sort()->values()->all())
+        ->and($events)->toContain('review', 'update');
 });
 
 test('the activity log can be filtered by event', function () {

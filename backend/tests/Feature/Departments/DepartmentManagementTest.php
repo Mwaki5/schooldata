@@ -39,6 +39,27 @@ test('departments can be searched by name', function () {
         ->assertJsonPath('departments.0.name', 'Computing and Informatics');
 });
 
+test('the department list supports status filters, sorting and pagination', function () {
+    Department::factory()->create(['name' => 'Biology', 'is_active' => true]);
+    Department::factory()->create(['name' => 'Zoology', 'is_active' => false]);
+
+    $token = departmentsAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/departments?is_active=0')
+        ->assertOk()
+        ->assertJsonCount(1, 'departments')
+        ->assertJsonPath('departments.0.name', 'Zoology');
+
+    $sorted = $this->withToken($token)
+        ->getJson('/api/departments?sort=name&order=desc')
+        ->assertOk();
+
+    expect(collect($sorted->json('departments'))->pluck('name')->all())
+        ->toBe(['Zoology', 'Biology'])
+        ->and($sorted->json('meta.total'))->toBe(2);
+});
+
 test('a department can be created with a hod user reference', function () {
     $hod = User::factory()->create(['name' => 'Dr. Mensah']);
 

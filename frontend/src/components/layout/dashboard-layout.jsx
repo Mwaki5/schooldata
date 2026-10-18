@@ -1,23 +1,32 @@
 import { Suspense, useEffect, useState } from 'react'
 import {
   BookOpen,
+  Calendar,
   CalendarCheck,
   ChevronRight,
   ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   School,
   ShieldCheck,
+  Sun,
   Wallet,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PageLoader from '@/components/page-loader'
 import { useAuth } from '@/context/AuthContext'
+import { useTheme } from '@/context/ThemeContext'
 import { cn } from '@/lib/utils'
 
+/**
+ * Top-level rail items. Each renders as its own row with a hairline divider
+ * above it; items with `children` expand nested links inline.
+ * Visibility is filtered by role (`roles`) before rendering.
+ */
 const NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/' },
   {
@@ -35,12 +44,26 @@ const NAV_ITEMS = [
     icon: BookOpen,
     roles: ['admin'],
     children: [
-      { label: 'Students', disabled: true, roles: ['admin'] },
+      { label: 'Students', to: '/students', roles: ['admin'] },
+      { label: 'Enrolments', to: '/enrolments', roles: ['admin'] },
       { label: 'Staff', to: '/staff', roles: ['admin'] },
       { label: 'Classes', disabled: true, roles: ['admin'] },
       { label: 'Departments', to: '/departments', roles: ['admin'] },
       { label: 'Exam Bodies', to: '/exam-bodies', roles: ['admin'] },
+      { label: 'Grades', to: '/exam-body-grades', roles: ['admin'] },
       { label: 'Certification Levels', to: '/certification-levels', roles: ['admin'] },
+      { label: 'Curriculum', to: '/curricula', roles: ['admin'] },
+      { label: 'Courses', to: '/courses', roles: ['admin'] },
+      { label: 'Units', to: '/units', roles: ['admin'] },
+    ],
+  },
+  {
+    label: 'Calendar',
+    icon: Calendar,
+    roles: ['admin'],
+    children: [
+      { label: 'Academic Year', to: '/academic-years', roles: ['admin'] },
+      { label: 'Academic Session', to: '/academic-sessions', roles: ['admin'] },
     ],
   },
   { label: 'Attendance', icon: CalendarCheck, disabled: true },
@@ -53,8 +76,18 @@ const PAGE_TITLES = {
   '/roles': 'Roles',
   '/departments': 'Departments',
   '/exam-bodies': 'Exam Bodies',
+  '/exam-body-grades': 'Exam Body Grades',
   '/certification-levels': 'Certification Levels',
+  '/curricula': 'Curriculum',
+  '/courses': 'Courses',
+  '/units': 'Units',
+  '/academic-years': 'Academic Years',
+  '/academic-sessions': 'Academic Sessions',
   '/staff': 'Staff',
+  '/students': 'Students',
+  '/students/create': 'Students',
+  '/students/:studentId/edit': 'Students',
+  '/enrolments': 'Enrolments',
   '/activities': 'Activity Log',
 }
 
@@ -109,17 +142,24 @@ function Sidebar({
   const navigate = useNavigate()
   const location = useLocation()
 
-  /** Manually toggled submenu groups: label -> open boolean. */
-  const [openGroups, setOpenGroups] = useState({})
+  /**
+   * Exclusive accordion: at most one submenu group is open at a time.
+   * `openGroup` holds the label the user explicitly opened (or null when
+   * none). When the user hasn't chosen, the group containing the active
+   * route stays open — so the selected item's group is always the open one.
+   */
+  const [openGroup, setOpenGroup] = useState(null)
 
   /** The icon-rail collapse only applies to the desktop sidebar. */
   const railCollapsed = !isMobile && collapsed
 
-  const toggleGroup = (label, defaultOpen) => {
-    setOpenGroups((current) => ({
-      ...current,
-      [label]: !(current[label] ?? defaultOpen),
-    }))
+  /** Whether a group is open: user's explicit choice wins, else the active one. */
+  const isGroupOpen = (label, hasActiveChild) =>
+    openGroup === null ? hasActiveChild : openGroup === label
+
+  /** Toggle one group; opening it closes every other group. */
+  const toggleGroup = (label, isOpen) => {
+    setOpenGroup(isOpen ? null : label)
   }
 
   /** In rail mode, clicking a group parent expands the sidebar instead. */
@@ -165,7 +205,7 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        'flex flex-col bg-[#1b263b]',
+        'flex flex-col border-r border-sidebar-border bg-sidebar',
         isMobile
           ? cn(
               'w-[250px]',
@@ -179,27 +219,36 @@ function Sidebar({
             ),
       )}
     >
+      {/* Brand row — 54px tall with a 30px emerald tile, matching the
+          reference's logo/title/subtitle hierarchy. */}
       <div
         className={cn(
-          'flex h-16 items-center border-b border-white/10',
-          railCollapsed ? 'justify-center px-3' : 'gap-2.5 pr-3 pl-5',
+          'flex h-[54px] shrink-0 items-center border-b border-sidebar-line',
+          railCollapsed ? 'justify-center px-3' : 'gap-2 pr-2 pl-3.5',
         )}
       >
-        <School className="size-6 shrink-0 text-white" aria-hidden="true" />
+        <span className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-sidebar-accent">
+          <School className="size-[17px] text-white" aria-hidden="true" />
+        </span>
         <span
           className={cn(
-            'flex-1 text-base font-semibold text-white',
+            'min-w-0 flex-1',
             railCollapsed && 'hidden',
           )}
         >
-          SchoolMS
+          <span className="block truncate text-sm font-bold text-white">
+            SchoolMS
+          </span>
+          <span className="block truncate text-[11px] text-sidebar-subtle">
+            School management portal
+          </span>
         </span>
         <button
           type="button"
           onClick={handleHeaderToggle}
           title={railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="shrink-0 rounded-lg p-2 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+          className="shrink-0 rounded-lg p-1 text-sidebar-text transition-colors hover:bg-white/10 hover:text-white"
         >
           {railCollapsed ? (
             <PanelLeftOpen className="size-[18px]" aria-hidden="true" />
@@ -209,8 +258,11 @@ function Sidebar({
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="Main">
-        {visibleNavItems.map((item) => {
+      <nav
+        className="sidebar-scroll flex-1 overflow-y-auto px-2 py-3"
+        aria-label="Main"
+      >
+        {visibleNavItems.map((item, itemIndex) => {
           if (item.children) {
             const hasActiveChild = item.children.some(
               (child) => child.to && isPathActive(location.pathname, child.to),
@@ -222,10 +274,16 @@ function Sidebar({
                 item={item}
                 railCollapsed={railCollapsed}
                 hasActiveChild={hasActiveChild}
-                isOpen={openGroups[item.label] ?? hasActiveChild}
-                onToggle={() => toggleGroup(item.label, hasActiveChild)}
+                isOpen={isGroupOpen(item.label, hasActiveChild)}
+                onToggle={() =>
+                  toggleGroup(
+                    item.label,
+                    isGroupOpen(item.label, hasActiveChild),
+                  )
+                }
                 onExpandRail={expandRail}
                 onCloseMobile={onCloseMobile}
+                withDivider={itemIndex > 0}
               />
             )
           }
@@ -237,8 +295,11 @@ function Sidebar({
                 aria-disabled="true"
                 title={railCollapsed ? item.label : undefined}
                 className={cn(
-                  'flex cursor-not-allowed items-center rounded-lg py-2.5 text-sm text-slate-400 opacity-70 select-none',
-                  railCollapsed ? 'justify-center px-0' : 'gap-3 px-3',
+                  // Every top-level label is separated by a hairline divider
+                  // (the first sits directly under the brand row's border).
+                  itemIndex > 0 && 'border-t border-sidebar-line',
+                  'flex h-11 cursor-not-allowed items-center text-[13px] text-sidebar-text/45 select-none',
+                  railCollapsed ? 'justify-center px-0' : 'gap-2.5 pr-4 pl-3.5',
                 )}
               >
                 <item.icon
@@ -250,7 +311,7 @@ function Sidebar({
                 </span>
                 <span
                   className={cn(
-                    'rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-slate-300 uppercase',
+                    'rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-sidebar-subtle uppercase',
                     railCollapsed && 'hidden',
                   )}
                 >
@@ -269,45 +330,62 @@ function Sidebar({
               title={railCollapsed ? item.label : undefined}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center rounded-lg py-2.5 transition-colors',
-                  railCollapsed ? 'justify-center px-0' : 'gap-3 px-3',
+                  // 44px square-cornered rows; the active row is a flat band
+                  // with a hairline bottom edge and a 3px emerald bar flush
+                  // to the left — no rounding. Its top edge is the divider.
+                  itemIndex > 0 && 'border-t border-sidebar-line',
+                  'relative flex h-11 items-center text-[13px] transition-colors',
+                  railCollapsed ? 'justify-center px-0' : 'gap-2.5 pr-4 pl-3.5',
                   isActive
-                    ? 'font-medium text-white'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white',
+                    ? 'border-b border-sidebar-line bg-sidebar-active font-semibold text-white'
+                    : 'text-sidebar-text hover:bg-white/[0.04] hover:text-white',
                 )
               }
             >
-              <item.icon className="size-[18px] shrink-0" aria-hidden="true" />
-              <span className={cn('flex-1', railCollapsed && 'hidden')}>
-                {item.label}
-              </span>
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 w-[3px] bg-sidebar-accent"
+                    />
+                  )}
+                  <item.icon
+                    className="size-[18px] shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className={cn('flex-1', railCollapsed && 'hidden')}>
+                    {item.label}
+                  </span>
+                </>
+              )}
             </NavLink>
           )
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-sidebar-line p-3">
         <div
           className={cn(
             'flex items-center',
             railCollapsed ? 'flex-col gap-2 py-1' : 'gap-3 px-2 py-1.5',
           )}
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#415a77] text-sm font-semibold text-white">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-white">
             {initial}
           </div>
           <div className={cn('min-w-0 flex-1', railCollapsed && 'hidden')}>
             <p className="truncate text-sm font-medium text-white">
               {user?.name}
             </p>
-            <p className="truncate text-xs text-slate-400">{user?.email}</p>
+            <p className="truncate text-xs text-sidebar-subtle">{user?.email}</p>
           </div>
           <button
             type="button"
             onClick={handleLogout}
             title="Sign out"
             aria-label="Sign out"
-            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+            className="shrink-0 rounded-lg p-2 text-sidebar-text transition-colors hover:bg-white/10 hover:text-white"
           >
             <LogOut className="size-[18px]" aria-hidden="true" />
           </button>
@@ -318,7 +396,7 @@ function Sidebar({
 }
 
 /**
- * A sidebar section with nested links. The parent row shows a chevron that
+ * A top-level nav item with nested links. The parent row shows a chevron that
  * flips between pointing right (collapsed) and left (expanded); in the
  * collapsed icon rail it renders as an icon that expands the sidebar.
  */
@@ -330,6 +408,7 @@ function NavGroup({
   onToggle,
   onExpandRail,
   onCloseMobile,
+  withDivider,
 }) {
   if (railCollapsed) {
     return (
@@ -339,10 +418,11 @@ function NavGroup({
         aria-label={item.label}
         onClick={onExpandRail}
         className={cn(
-          'flex w-full items-center justify-center rounded-lg py-2.5 transition-colors',
+          withDivider && 'border-t border-sidebar-line',
+          'flex h-11 w-full items-center justify-center transition-colors',
           hasActiveChild
-            ? 'bg-white/10 text-white'
-            : 'text-slate-300 hover:bg-white/5 hover:text-white',
+            ? 'bg-sidebar-active text-white'
+            : 'text-sidebar-text hover:bg-white/[0.04] hover:text-white',
         )}
       >
         <item.icon className="size-[18px] shrink-0" aria-hidden="true" />
@@ -357,10 +437,11 @@ function NavGroup({
         onClick={onToggle}
         aria-expanded={isOpen}
         className={cn(
-          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+          withDivider && 'border-t border-sidebar-line',
+          'flex h-11 w-full items-center gap-2.5 pr-4 pl-3.5 text-[13px] transition-colors',
           hasActiveChild
-            ? 'bg-white/10 font-medium text-white'
-            : 'text-slate-300 hover:bg-white/5 hover:text-white',
+            ? 'bg-sidebar-active font-semibold text-white'
+            : 'text-sidebar-text hover:bg-white/[0.04] hover:text-white',
         )}
       >
         <item.icon className="size-[18px] shrink-0" aria-hidden="true" />
@@ -375,16 +456,16 @@ function NavGroup({
       </button>
 
       {isOpen && (
-        <div className="mt-1 space-y-1">
+        <div className="relative mt-1 mb-1 ml-3 space-y-0.5 border-l border-sidebar-line pl-3">
           {item.children.map((child) =>
             child.disabled ? (
               <div
                 key={child.label}
                 aria-disabled="true"
-                className="flex cursor-not-allowed items-center rounded-lg py-2 pr-3 pl-11 text-[13px] text-slate-400 opacity-70 select-none"
+                className="flex cursor-not-allowed items-center py-1.5 pr-2 pl-3 text-[13px] text-sidebar-text/45 select-none"
               >
                 <span className="flex-1">{child.label}</span>
-                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-slate-300 uppercase">
+                <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-sidebar-subtle uppercase">
                   Soon
                 </span>
               </div>
@@ -395,10 +476,10 @@ function NavGroup({
                 onClick={onCloseMobile}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center rounded-lg py-2 pr-3 pl-11 transition-colors',
+                    'relative flex items-center py-1.5 pr-2 pl-3 text-[13px] transition-colors',
                     isActive
-                      ? 'font-medium text-white'
-                      : 'text-slate-300 hover:bg-white/5 hover:text-white',
+                      ? 'border-l-[3px] border-sidebar-accent bg-sidebar-active pl-[9px] font-semibold text-white -ml-[3px]'
+                      : 'text-sidebar-text hover:bg-white/[0.04] hover:text-white',
                   )
                 }
               >
@@ -414,6 +495,7 @@ function NavGroup({
 
 function Navbar({ isMobile, onOpenMobile }) {
   const location = useLocation()
+  const { theme, toggleTheme } = useTheme()
 
   const title = pageTitleFor(location.pathname)
   const today = new Date().toLocaleDateString(undefined, {
@@ -424,7 +506,7 @@ function Navbar({ isMobile, onOpenMobile }) {
   })
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:px-6">
       <div className="flex items-center gap-3">
         {isMobile && (
           <button
@@ -437,9 +519,27 @@ function Navbar({ isMobile, onOpenMobile }) {
             <Menu className="size-5" aria-hidden="true" />
           </button>
         )}
-        <h1 className="text-lg font-semibold">{title}</h1>
+        <h1 className="text-[15px] font-semibold tracking-tight">{title}</h1>
       </div>
-      <p className="hidden text-sm text-muted-foreground sm:block">{today}</p>
+      <div className="flex items-center gap-1.5">
+        <p className="mr-2 hidden text-sm text-muted-foreground sm:block">
+          {today}
+        </p>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-pressed={theme === 'dark'}
+          className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          {theme === 'dark' ? (
+            <Sun className="size-[18px]" aria-hidden="true" />
+          ) : (
+            <Moon className="size-[18px]" aria-hidden="true" />
+          )}
+        </button>
+      </div>
     </header>
   )
 }
@@ -480,7 +580,10 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="flex min-h-svh">
+    // The shell is locked to the viewport height so the document itself
+    // never scrolls: the sidebar and navbar stay fixed and only <main>
+    // below the sticky navbar overflows.
+    <div className="flex h-svh overflow-hidden">
       {isMobile && mobileOpen && (
         <div
           aria-hidden="true"
@@ -495,9 +598,9 @@ export default function DashboardLayout() {
         onToggleCollapsed={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar isMobile={isMobile} onOpenMobile={() => setMobileOpen(true)} />
-        <main className="flex-1 p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           {/* Lazily-loaded child routes swap in here without unmounting
               the shell (sidebar + navbar stay visible during loads). */}
           <Suspense fallback={<PageLoader />}>

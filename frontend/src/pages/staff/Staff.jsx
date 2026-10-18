@@ -1,15 +1,18 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { ListPagination } from '@/components/list-pagination'
+import { ListSearch } from '@/components/list-search'
+import { SortableTh } from '@/components/sortable-th'
+import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -54,20 +57,25 @@ function StatusBadge({ status }) {
 }
 
 export default function Staff() {
-  const [staff, setStaff] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
-  useEffect(() => {
-    api
-      .get('/staff')
-      .then(({ data }) => setStaff(data.staff))
-      .catch(() =>
-        setLoadError('Unable to load staff. Please try again.'),
-      )
-      .finally(() => setLoading(false))
-  }, [])
+  const {
+    items: staff,
+    meta,
+    loading,
+    loadError,
+    search,
+    setSearch,
+    goToPage,
+    sort,
+    order,
+    toggleSort,
+    refresh,
+  } = useList({
+    resource: 'staff',
+    endpoint: '/staff',
+    errorMessage: 'Unable to load staff. Please try again.',
+  })
 
   const handleDelete = async (staffMember) => {
     if (
@@ -83,9 +91,7 @@ export default function Staff() {
     try {
       await api.delete(`/staff/${staffMember.id}`)
 
-      setStaff((current) =>
-        current.filter((item) => item.id !== staffMember.id),
-      )
+      refresh()
       toast.success(`Deleted "${staffMember.employment_no}"`)
     } catch {
       toast.error(
@@ -121,90 +127,116 @@ export default function Staff() {
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>All Staff</CardTitle>
-          <CardDescription>
-            {loading
-              ? 'Loading staff…'
-              : `${staff.length} ${
-                  staff.length === 1 ? 'staff member' : 'staff members'
-                } total`}
-          </CardDescription>
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search staff…"
+          />
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : staff.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No staff members yet. Create the first one with the button
-              above.
+              {search
+                ? `No staff members match “${search}”.`
+                : 'No staff members yet. Create the first one with the button above.'}
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-3 font-medium">Employee No</th>
-                  <th className="pb-3 font-medium">Name</th>
-                  <th className="pb-3 font-medium">Role</th>
-                  <th className="pb-3 font-medium">Department</th>
-                  <th className="pb-3 font-medium">Position</th>
-                  <th className="pb-3 font-medium">Type</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {staff.map((staffMember) => (
-                  <tr key={staffMember.id}>
-                    <td className="py-3 text-muted-foreground">
-                      {staffMember.employment_no}
-                    </td>
-                    <td className="py-3 font-medium">{staffMember.name}</td>
-                    <td className="py-3 text-muted-foreground">
-                      {ROLE_LABELS[staffMember.role] ?? '—'}
-                    </td>
-                    <td className="py-3 text-muted-foreground">
-                      {staffMember.department_name ?? '—'}
-                    </td>
-                    <td className="py-3 text-muted-foreground">
-                      {staffMember.position ?? '—'}
-                    </td>
-                    <td className="py-3 text-muted-foreground">
-                      {EMPLOYMENT_TYPE_LABELS[staffMember.employment_type] ??
-                        '—'}
-                    </td>
-                    <td className="py-3">
-                      <StatusBadge status={staffMember.employment_status} />
-                    </td>
-                    <td className="py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          to={`/staff/${staffMember.id}/edit`}
-                          className={buttonVariants({
-                            variant: 'ghost',
-                            size: 'sm',
-                          })}
-                        >
-                          <Pencil aria-hidden="true" />
-                          Edit
-                        </Link>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          disabled={deletingId === staffMember.id}
-                          onClick={() => handleDelete(staffMember)}
-                        >
-                          <Trash2 aria-hidden="true" />
-                          {deletingId === staffMember.id
-                            ? 'Deleting…'
-                            : 'Delete'}
-                        </Button>
-                      </div>
-                    </td>
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <SortableTh
+                      column="employment_no"
+                      label="Employee No"
+                      sort={sort}
+                      order={order}
+                      onSort={toggleSort}
+                    />
+                    <SortableTh
+                      column="name"
+                      label="Name"
+                      sort={sort}
+                      order={order}
+                      onSort={toggleSort}
+                    />
+                    <th className="pb-3 font-medium">Role</th>
+                    <th className="pb-3 font-medium">Department</th>
+                    <th className="pb-3 font-medium">Position</th>
+                    <th className="pb-3 font-medium">Type</th>
+                    <SortableTh
+                      column="employment_status"
+                      label="Status"
+                      sort={sort}
+                      order={order}
+                      onSort={toggleSort}
+                    />
+                    <th className="pb-3 text-right font-medium">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {staff.map((staffMember) => (
+                    <tr key={staffMember.id}>
+                      <td className="py-3 text-muted-foreground">
+                        {staffMember.employment_no}
+                      </td>
+                      <td className="py-3 font-medium">{staffMember.name}</td>
+                      <td className="py-3 text-muted-foreground">
+                        {ROLE_LABELS[staffMember.role] ?? '—'}
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {staffMember.department_name ?? '—'}
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {staffMember.position ?? '—'}
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {EMPLOYMENT_TYPE_LABELS[staffMember.employment_type] ??
+                          '—'}
+                      </td>
+                      <td className="py-3">
+                        <StatusBadge status={staffMember.employment_status} />
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={`/staff/${staffMember.id}/edit`}
+                            className={buttonVariants({
+                              variant: 'ghost',
+                              size: 'sm',
+                            })}
+                          >
+                            <Pencil aria-hidden="true" />
+                            Edit
+                          </Link>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={deletingId === staffMember.id}
+                            onClick={() => handleDelete(staffMember)}
+                          >
+                            <Trash2 aria-hidden="true" />
+                            {deletingId === staffMember.id
+                              ? 'Deleting…'
+                              : 'Delete'}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <ListPagination
+                meta={meta}
+                loading={loading}
+                onPageChange={goToPage}
+                label="staff members"
+              />
+            </>
           )}
         </CardContent>
       </Card>

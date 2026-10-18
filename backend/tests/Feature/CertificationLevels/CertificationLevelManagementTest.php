@@ -56,6 +56,46 @@ test('certification levels are listed grouped by exam body then sequence', funct
         ->assertJsonPath('certification_levels.2.exam_body_name', 'B Council');
 });
 
+test('the certification level list supports search, filters, sorting and pagination', function () {
+    $bodyA = ExamBody::factory()->create(['name' => 'A Council']);
+    $bodyB = ExamBody::factory()->create(['name' => 'B Council']);
+
+    CertificationLevel::factory()->create([
+        'exam_body_id' => $bodyA->id,
+        'name' => 'Diploma',
+        'code' => 'DIPLOMA',
+        'sequence' => 2,
+    ]);
+    CertificationLevel::factory()->create([
+        'exam_body_id' => $bodyB->id,
+        'name' => 'Masters Degree',
+        'code' => 'MASTERS',
+        'sequence' => 1,
+    ]);
+
+    $token = certificationLevelsAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/certification-levels?search=master')
+        ->assertOk()
+        ->assertJsonCount(1, 'certification_levels')
+        ->assertJsonPath('certification_levels.0.name', 'Masters Degree');
+
+    $this->withToken($token)
+        ->getJson('/api/certification-levels?exam_body_id='.$bodyA->id)
+        ->assertOk()
+        ->assertJsonCount(1, 'certification_levels')
+        ->assertJsonPath('certification_levels.0.name', 'Diploma');
+
+    $sorted = $this->withToken($token)
+        ->getJson('/api/certification-levels?sort=name&order=asc')
+        ->assertOk();
+
+    expect(collect($sorted->json('certification_levels'))->pluck('name')->all())
+        ->toBe(['Diploma', 'Masters Degree'])
+        ->and($sorted->json('meta.per_page'))->toBe(20);
+});
+
 test('a certification level can be created with audit stamps', function () {
     $creator = User::factory()->create();
     $examBody = ExamBody::factory()->create();

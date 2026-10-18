@@ -26,10 +26,6 @@ export function setAccessToken(token) {
   accessToken = token
 }
 
-export function getAccessToken() {
-  return accessToken
-}
-
 let refreshPromise = null
 
 /**
@@ -126,6 +122,31 @@ export function validationErrors(error) {
       Array.isArray(messages) ? messages[0] : String(messages),
     ]),
   )
+}
+
+/**
+ * Whether a failed request was answered with an HTTP 404: the API has no
+ * such record (route-model binding) or no such endpoint at all.
+ *
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function isNotFound(error) {
+  return axios.isAxiosError(error) && error.response?.status === 404
+}
+
+/**
+ * Message for a record that failed to load: a specific "not found" note when
+ * the API answered 404, the generic fallback for every other failure
+ * (validation, 500, network down, ...).
+ *
+ * @param {unknown} error
+ * @param {string} label Resource label, e.g. `'Student'`.
+ * @param {string} fallback Message shown when the failure is not a 404.
+ * @returns {string}
+ */
+export function loadErrorMessage(error, label, fallback) {
+  return isNotFound(error) ? `${label} not found. It may have been deleted.` : fallback
 }
 
 export default api
