@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\Role;
+use App\Models\StudentProfile;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -26,11 +27,23 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        User::firstOrCreate(
+        $student = User::firstOrCreate(
             ['email' => 'test@example.com'],
             [
                 'name' => 'Test User',
+                'login_id' => 'ADM0001',
                 'password' => Hash::make('password'),
+            ],
+        );
+
+        // Student accounts ship with their profile row, the same way the
+        // admin's student registration action creates one.
+        StudentProfile::firstOrCreate(
+            ['user_id' => $student->id],
+            [
+                'first_name' => 'Test',
+                'last_name' => 'User',
+                'status' => 'active',
             ],
         );
     }

@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 export default function CurriculumForm() {
   const { curriculumId } = useParams()
@@ -51,10 +51,14 @@ export default function CurriculumForm() {
           )
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the curriculum. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Curriculum',
+              'Unable to load the curriculum. It may have been deleted.',
+            ),
           )
         }
       })

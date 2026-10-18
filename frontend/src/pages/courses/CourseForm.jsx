@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 export default function CourseForm() {
   const { courseId } = useParams()
@@ -51,10 +51,14 @@ export default function CourseForm() {
           )
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the course. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Course',
+              'Unable to load the course. It may have been deleted.',
+            ),
           )
         }
       })

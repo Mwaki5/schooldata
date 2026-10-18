@@ -7,11 +7,16 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CertificationLevels\CertificationLevelController;
 use App\Http\Controllers\Courses\CourseController;
+use App\Http\Controllers\CourseUnits\CourseUnitController;
 use App\Http\Controllers\Curriculums\CurriculumController;
 use App\Http\Controllers\Departments\DepartmentController;
+use App\Http\Controllers\Enrolments\EnrolmentController;
 use App\Http\Controllers\ExamBodies\ExamBodyController;
+use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
 use App\Http\Controllers\Roles\RoleController;
 use App\Http\Controllers\Staff\StaffController;
+use App\Http\Controllers\Students\StudentController;
+use App\Http\Controllers\Units\UnitController;
 use App\Http\Controllers\Users\UserController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
@@ -103,6 +108,27 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('exam-bodies.destroy');
 
+    Route::get('exam-body-grades', [ExamBodyGradeController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('exam-body-grades.index');
+    Route::post('exam-body-grades', [ExamBodyGradeController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('exam-body-grades.store');
+    Route::get('exam-body-grades/{examBodyGrade}', [ExamBodyGradeController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('exam-body-grades.show');
+    Route::match(['PUT', 'PATCH'], 'exam-body-grades/{examBodyGrade}', [ExamBodyGradeController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('exam-body-grades.update');
+    Route::delete('exam-body-grades/{examBodyGrade}', [ExamBodyGradeController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('exam-body-grades.destroy');
+
     Route::get('certification-levels', [CertificationLevelController::class, 'index'])
         ->middleware('role:admin')
         ->middleware('throttle:api')
@@ -166,6 +192,56 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('courses.destroy');
 
+    Route::get('units/duplicates', [UnitController::class, 'duplicates'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('units.duplicates');
+    Route::get('units', [UnitController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('units.index');
+    Route::post('units', [UnitController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('units.store');
+    Route::get('units/{unit}', [UnitController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('units.show');
+    Route::match(['PUT', 'PATCH'], 'units/{unit}', [UnitController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('units.update');
+    Route::delete('units/{unit}', [UnitController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('units.destroy');
+
+    Route::get('courses/{course}/units', [CourseUnitController::class, 'byCourse'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.by-course');
+    Route::get('units/{unit}/assignments', [CourseUnitController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.index');
+    Route::post('units/{unit}/assignments', [CourseUnitController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.store');
+    Route::get('course-units/{courseUnit}', [CourseUnitController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.show');
+    Route::match(['PUT', 'PATCH'], 'course-units/{courseUnit}', [CourseUnitController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.update');
+    Route::delete('course-units/{courseUnit}', [CourseUnitController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.destroy');
+
     Route::get('academic-years', [AcademicYearController::class, 'index'])
         ->middleware('role:admin')
         ->middleware('throttle:api')
@@ -228,6 +304,40 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('staff.destroy');
+
+    Route::get('students', [StudentController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('students.index');
+    Route::post('students', [StudentController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('students.store');
+    Route::get('students/{student}', [StudentController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('students.show');
+    Route::match(['PUT', 'PATCH'], 'students/{student}', [StudentController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('students.update');
+    Route::delete('students/{student}', [StudentController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('students.destroy');
+
+    Route::get('enrolments', [EnrolmentController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('enrolments.index');
+    Route::get('enrolments/{enrolment}', [EnrolmentController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('enrolments.show');
+    Route::delete('enrolments/{enrolment}', [EnrolmentController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('enrolments.destroy');
 
     Route::get('activities', [ActivityController::class, 'index'])
         ->middleware('role:admin')

@@ -9,7 +9,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { Pencil, Trash2, Plus } from 'lucide-react'
+import { BookOpen, Pencil, Trash2, Plus } from 'lucide-react'
 
 function StatusBadge({ active }) {
   return (
@@ -168,6 +168,12 @@ export default function Courses() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={`/courses/${course.id}/units`}
+                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                            title="View and edit this course's units">
+                            <BookOpen aria-hidden="true" /> Units
+                          </Link>
                           <Link
                             to={`/courses/${course.id}/edit`}
                             className={buttonVariants({ variant: 'ghost', size: 'sm' })}>

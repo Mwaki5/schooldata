@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 export default function AcademicSessionForm() {
   const { sessionId } = useParams()
@@ -54,10 +54,14 @@ export default function AcademicSessionForm() {
           )
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the academic session. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Academic session',
+              'Unable to load the academic session. It may have been deleted.',
+            ),
           )
         }
       })

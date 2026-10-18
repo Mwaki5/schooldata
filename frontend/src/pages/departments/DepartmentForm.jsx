@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 import { toast } from 'sonner'
 
 export default function DepartmentForm() {
@@ -63,10 +63,14 @@ export default function DepartmentForm() {
           )
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the department. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Department',
+              'Unable to load the department. It may have been deleted.',
+            ),
           )
         }
       })

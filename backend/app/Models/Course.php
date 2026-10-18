@@ -6,6 +6,7 @@ use Database\Factories\CourseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -69,6 +70,15 @@ class Course extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * The unit assignments delivered under this course, one per
+     * curriculum. The master units themselves live on the units table.
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(CourseUnit::class);
     }
 
     /**

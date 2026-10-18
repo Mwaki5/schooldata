@@ -16,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 const EMPLOYMENT_TYPES = [
   { value: 'full_time', label: 'Full-time' },
@@ -91,10 +91,14 @@ export default function StaffForm() {
           )
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the staff member. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Staff member',
+              'Unable to load the staff member. It may have been deleted.',
+            ),
           )
         }
       })

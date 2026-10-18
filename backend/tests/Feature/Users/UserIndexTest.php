@@ -42,14 +42,20 @@ test('the user list can be searched by name or email', function () {
     User::factory()->create(['name' => 'Ada King', 'email' => 'king@school.test']);
     User::factory()->create(['name' => 'Grace Hopper', 'email' => 'grace@school.test']);
 
-    $byName = $this->withToken(usersAccessTokenFor(User::factory()->create()))
+    $byName = $this->withToken(usersAccessTokenFor(User::factory()->create([
+        'name' => 'List Watcher',
+        'email' => 'watcher@school.test',
+    ])))
         ->getJson('/api/users?search=ada')
         ->assertOk()
         ->json('users');
 
     expect(collect($byName)->pluck('name')->all())->toBe(['Ada King', 'Ada Lovelace']);
 
-    $byEmail = $this->withToken(usersAccessTokenFor(User::factory()->create()))
+    $byEmail = $this->withToken(usersAccessTokenFor(User::factory()->create([
+        'name' => 'Mail Watcher',
+        'email' => 'mail-watcher@school.test',
+    ])))
         ->getJson('/api/users?search=grace@')
         ->assertOk()
         ->json('users');

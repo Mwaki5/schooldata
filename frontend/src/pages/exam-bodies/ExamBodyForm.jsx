@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 export default function ExamBodyForm() {
   const { examBodyId } = useParams()
@@ -41,10 +41,14 @@ export default function ExamBodyForm() {
           setExamBody(data.exam_body)
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the exam body. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Exam body',
+              'Unable to load the exam body. It may have been deleted.',
+            ),
           )
         }
       })

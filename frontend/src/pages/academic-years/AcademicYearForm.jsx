@@ -8,7 +8,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import api, { validationErrors } from '@/lib/api'
+import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
 export default function AcademicYearForm() {
   const { yearId } = useParams()
@@ -36,10 +36,14 @@ export default function AcademicYearForm() {
           setYear(data.academic_year)
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
           setLoadError(
-            'Unable to load the academic year. It may have been deleted.',
+            loadErrorMessage(
+              error,
+              'Academic year',
+              'Unable to load the academic year. It may have been deleted.',
+            ),
           )
         }
       })

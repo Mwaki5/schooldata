@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import api from '@/lib/api'
+import api, { isNotFound } from '@/lib/api'
 
 const SEARCH_DEBOUNCE_MS = 300
 
@@ -27,6 +27,7 @@ const SEARCH_DEBOUNCE_MS = 300
  * @param {'asc'|'desc'} [options.defaultOrder] Direction paired with `defaultSort`.
  * @param {number} [options.perPage] Rows per page (API maximum is 100).
  * @param {string} [options.errorMessage] Shown when the request fails.
+ * @param {string} [options.notFoundMessage] Shown instead when the API answers 404.
  * @param {((data: Record<string, unknown>) => void)|null} [options.onData] Called with the full response (extra payloads like `filters`).
  */
 export function useList({
@@ -37,6 +38,7 @@ export function useList({
   defaultOrder = 'asc',
   perPage = 20,
   errorMessage = 'Unable to load records. Please try again.',
+  notFoundMessage = `The ${resource} list was not found on the server. The API may be out of date.`,
   onData = null,
 }) {
   const [items, setItems] = useState([])
@@ -133,9 +135,9 @@ export function useList({
           setPage(page - 1)
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
-          setLoadError(errorMessage)
+          setLoadError(isNotFound(error) ? notFoundMessage : errorMessage)
         }
       })
       .finally(() => {
@@ -158,6 +160,7 @@ export function useList({
     perPage,
     refreshTick,
     errorMessage,
+    notFoundMessage,
   ])
 
   /** Cycle a sortable column: none → ascending → descending → default. */
