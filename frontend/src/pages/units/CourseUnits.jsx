@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, Link2, Pencil, Power, Trash2 } from 'lucide-react'
+import { ArrowLeft, BookOpen, Pencil, Plus, Power, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -24,20 +24,17 @@ function StatusBadge({ active }) {
 }
 
 /**
- * The course-side twin of a unit's details page: every unit assigned to
- * one course, grouped per curriculum — which is where a delivery really
- * happens — with each assignment editable in place of its own teaching
- * load. The master unit data lives on the unit itself and is never
- * changed from here.
+ * The course-side view of the units list: every unit this course teaches,
+ * grouped per curriculum — each row one unit offering, editable in place.
  */
 export default function CourseUnits() {
   const { courseId } = useParams()
 
   const [course, setCourse] = useState(null)
-  const [assignments, setAssignments] = useState([])
+  const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
-  const [busyId, setBusyId] = useState(null) // assignment being changed
+  const [busyId, setBusyId] = useState(null) // unit being changed
 
   // No synchronous setState: the effect's fetch reports through promise
   // callbacks, and `loading` starts as `true` for the initial render.
@@ -45,7 +42,7 @@ export default function CourseUnits() {
     Promise.all([api.get(`/courses/${courseId}`), api.get(`/courses/${courseId}/units`)])
       .then(([courseResponse, unitsResponse]) => {
         setCourse(courseResponse.data.course)
-        setAssignments(unitsResponse.data.assignments ?? [])
+        setUnits(unitsResponse.data.units ?? [])
         setLoadError(null)
       })
       .catch((error) => {
@@ -72,54 +69,57 @@ export default function CourseUnits() {
     load()
   }
 
-  const handleToggleAssignment = async (assignment) => {
-    setBusyId(assignment.id)
+  const handleToggleActive = async (unit) => {
+    setBusyId(unit.id)
 
     try {
-      await api.put(`/course-units/${assignment.id}`, {
-        course_id: assignment.course_id,
-        curriculum_id: assignment.curriculum_id,
-        core: assignment.core,
-        time_offered: assignment.time_offered,
-        taught_hours: assignment.taught_hours,
-        credit_factor: assignment.credit_factor,
-        is_active: !assignment.is_active,
+      await api.put(`/units/${unit.id}`, {
+        course_id: unit.course_id,
+        curriculum_id: unit.curriculum_id,
+        code: unit.code,
+        name: unit.name,
+        description: unit.description,
+        modules_taught: unit.modules_taught,
+        taught_hours: unit.taught_hours,
+        credit_factor: unit.credit_factor,
+        core: unit.core,
+        is_active: !unit.is_active,
       })
 
       toast.success(
-        `${assignment.unit_code} ${assignment.is_active ? 'deactivated in' : 'activated in'} ${assignment.curriculum_name}`,
+        `${unit.code} ${unit.is_active ? 'deactivated in' : 'activated in'} ${unit.curriculum?.name}`,
       )
       reload()
     } catch (error) {
       toast.error(
-        error.response?.data?.message ?? 'Unable to update the assignment.',
+        error.response?.data?.message ?? 'Unable to update the unit.',
       )
     } finally {
       setBusyId(null)
     }
   }
 
-  const handleRemoveAssignment = async (assignment) => {
+  const handleDelete = async (unit) => {
     if (
       !window.confirm(
-        `Remove ${assignment.unit_code} from this course under ${assignment.curriculum_name}? The unit itself is kept.`,
+        `Remove ${unit.code} from this course under ${unit.curriculum?.name}? Its code becomes available again in this curriculum.`,
       )
     ) {
       return
     }
 
-    setBusyId(assignment.id)
+    setBusyId(unit.id)
 
     try {
-      await api.delete(`/course-units/${assignment.id}`)
+      await api.delete(`/units/${unit.id}`)
 
       toast.success(
-        `Removed ${assignment.unit_code} from ${assignment.curriculum_name}`,
+        `Removed ${unit.code} from ${unit.curriculum?.name}`,
       )
       reload()
     } catch (error) {
       toast.error(
-        error.response?.data?.message ?? 'Unable to remove the assignment.',
+        error.response?.data?.message ?? 'Unable to remove the unit.',
       )
     } finally {
       setBusyId(null)
@@ -149,20 +149,20 @@ export default function CourseUnits() {
   // One section per curriculum, in the order the API returned them.
   const byCurriculum = []
 
-  for (const assignment of assignments) {
+  for (const unit of units) {
     const existing = byCurriculum.find(
-      (section) => section.curriculum.id === assignment.curriculum_id,
+      (section) => section.curriculum.id === unit.curriculum_id,
     )
 
     if (existing) {
-      existing.rows.push(assignment)
+      existing.rows.push(unit)
     } else {
       byCurriculum.push({
         curriculum: {
-          id: assignment.curriculum_id,
-          name: assignment.curriculum_name,
+          id: unit.curriculum_id,
+          name: unit.curriculum?.name ?? '',
         },
-        rows: [assignment],
+        rows: [unit],
       })
     }
   }
@@ -185,35 +185,35 @@ export default function CourseUnits() {
             </div>
             <CardDescription>
               Every unit this course teaches, grouped by curriculum. Each
-              assignment carries its own teaching load.
+              unit carries its own teaching load.
             </CardDescription>
             <p className="text-xs text-muted-foreground">
-              {assignments.length}{' '}
-              {assignments.length === 1 ? 'assignment' : 'assignments'} across{' '}
+              {units.length}{' '}
+              {units.length === 1 ? 'unit' : 'units'} across{' '}
               {byCurriculum.length}{' '}
               {byCurriculum.length === 1 ? 'curriculum' : 'curricula'}
             </p>
           </div>
           <Link
-            to={`/units/assign?course=${course.id}`}
+            to={`/units/create?course=${course.id}`}
             className={buttonVariants()}
           >
-            <Link2 aria-hidden="true" /> Assign Unit
+            <Plus aria-hidden="true" /> Add Unit
           </Link>
         </CardHeader>
       </Card>
 
-      {assignments.length === 0 ? (
+      {units.length === 0 ? (
         <Card>
           <CardContent className="space-y-3 py-8">
             <p className="text-sm text-muted-foreground">
-              No units are assigned to this course yet.
+              This course has no units yet.
             </p>
             <Link
-              to={`/units/assign?course=${course.id}`}
+              to={`/units/create?course=${course.id}`}
               className={buttonVariants({ variant: 'outline' })}
             >
-              <Link2 aria-hidden="true" /> Assign Unit
+              <Plus aria-hidden="true" /> Add Unit
             </Link>
           </CardContent>
         </Card>
@@ -233,10 +233,10 @@ export default function CourseUnits() {
                 </CardDescription>
               </div>
               <Link
-                to={`/units/assign?course=${course.id}&curriculum=${section.curriculum.id}`}
+                to={`/units/create?course=${course.id}&curriculum=${section.curriculum.id}`}
                 className={buttonVariants({ variant: 'outline', size: 'sm' })}
               >
-                <Link2 aria-hidden="true" /> Assign Unit
+                <Plus aria-hidden="true" /> Add Unit
               </Link>
             </CardHeader>
             <CardContent>
@@ -246,7 +246,6 @@ export default function CourseUnits() {
                     <tr className="border-b text-left text-muted-foreground">
                       <th className="pb-3 font-medium">Unit</th>
                       <th className="pb-3 font-medium">Core</th>
-                      <th className="pb-3 font-medium">Time Offered</th>
                       <th className="pb-3 font-medium">Hours</th>
                       <th className="pb-3 font-medium">Credit</th>
                       <th className="pb-3 font-medium">Status</th>
@@ -254,77 +253,74 @@ export default function CourseUnits() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {section.rows.map((assignment) => (
-                      <tr key={assignment.id}>
+                    {section.rows.map((unit) => (
+                      <tr key={unit.id}>
                         <td className="py-3">
                           <Link
-                            to={`/units/${assignment.unit_id}`}
+                            to={`/units/${unit.id}`}
                             className="font-medium hover:underline"
                           >
-                            {assignment.unit_name}
+                            {unit.name}
                           </Link>
                           <span className="ml-1.5 font-mono text-xs text-muted-foreground">
-                            {assignment.unit_code}
+                            {unit.code}
                           </span>
                         </td>
                         <td className="py-3">
                           <span
                             className={cn(
                               'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                              assignment.core
+                              unit.core
                                 ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
                                 : 'bg-muted text-muted-foreground',
                             )}
                           >
-                            {assignment.core ? 'Core' : 'Elective'}
+                            {unit.core ? 'Core' : 'Elective'}
                           </span>
                         </td>
                         <td className="py-3 text-muted-foreground">
-                          {assignment.time_offered ?? '—'}
+                          {unit.taught_hours ?? '—'}
                         </td>
                         <td className="py-3 text-muted-foreground">
-                          {assignment.taught_hours ?? '—'}
-                        </td>
-                        <td className="py-3 text-muted-foreground">
-                          {assignment.credit_factor ?? '—'}
+                          {unit.credit_factor ?? '—'}
                         </td>
                         <td className="py-3">
-                          <StatusBadge active={assignment.is_active} />
+                          <StatusBadge active={unit.is_active} />
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1">
                             <Link
-                              to={`/course-units/${assignment.id}/edit`}
+                              to={`/units/${unit.id}/edit`}
                               className={buttonVariants({
                                 variant: 'ghost',
                                 size: 'sm',
                               })}
-                              title="Edit assignment"
-                              aria-label={`Edit ${assignment.unit_code} in ${assignment.curriculum_name}`}
+                              title="Edit unit"
+                              aria-label={`Edit ${unit.code} in ${unit.curriculum?.name}`}
                             >
                               <Pencil aria-hidden="true" />
                             </Link>
                             <Button
                               variant="ghost"
                               size="sm"
-                              disabled={busyId === assignment.id}
+                              disabled={busyId === unit.id}
                               title={
-                                assignment.is_active
-                                  ? 'Deactivate assignment'
-                                  : 'Activate assignment'
+                                unit.is_active
+                                  ? 'Deactivate unit'
+                                  : 'Activate unit'
                               }
-                              aria-label={`${assignment.is_active ? 'Deactivate' : 'Activate'} ${assignment.unit_code} in ${assignment.curriculum_name}`}
-                              onClick={() => handleToggleAssignment(assignment)}
+                              aria-label={`${unit.is_active ? 'Deactivate' : 'Activate'} ${unit.code} in ${unit.curriculum?.name}`}
+                              onClick={() => handleToggleActive(unit)}
                             >
                               <Power aria-hidden="true" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              disabled={busyId === assignment.id}
-                              title="Remove assignment"
-                              aria-label={`Remove ${assignment.unit_code} from ${assignment.curriculum_name}`}
-                              onClick={() => handleRemoveAssignment(assignment)}
+                              disabled={busyId === unit.id}
+                              title="Remove unit"
+                              aria-label={`Remove ${unit.code} from ${unit.curriculum?.name}`}
+                              onClick={() => handleDelete(unit)}
                             >
                               <Trash2 aria-hidden="true" />
                             </Button>

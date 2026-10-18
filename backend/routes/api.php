@@ -7,7 +7,6 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CertificationLevels\CertificationLevelController;
 use App\Http\Controllers\Courses\CourseController;
-use App\Http\Controllers\CourseUnits\CourseUnitController;
 use App\Http\Controllers\Curriculums\CurriculumController;
 use App\Http\Controllers\Departments\DepartmentController;
 use App\Http\Controllers\Enrolments\EnrolmentController;
@@ -192,10 +191,6 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('courses.destroy');
 
-    Route::get('units/duplicates', [UnitController::class, 'duplicates'])
-        ->middleware('role:admin')
-        ->middleware('throttle:api')
-        ->name('units.duplicates');
     Route::get('units', [UnitController::class, 'index'])
         ->middleware('role:admin')
         ->middleware('throttle:api')
@@ -217,30 +212,10 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('units.destroy');
 
-    Route::get('courses/{course}/units', [CourseUnitController::class, 'byCourse'])
+    Route::get('courses/{course}/units', [UnitController::class, 'byCourse'])
         ->middleware('role:admin')
         ->middleware('throttle:api')
-        ->name('course-units.by-course');
-    Route::get('units/{unit}/assignments', [CourseUnitController::class, 'index'])
-        ->middleware('role:admin')
-        ->middleware('throttle:api')
-        ->name('course-units.index');
-    Route::post('units/{unit}/assignments', [CourseUnitController::class, 'store'])
-        ->middleware('role:admin')
-        ->middleware('throttle:api')
-        ->name('course-units.store');
-    Route::get('course-units/{courseUnit}', [CourseUnitController::class, 'show'])
-        ->middleware('role:admin')
-        ->middleware('throttle:api')
-        ->name('course-units.show');
-    Route::match(['PUT', 'PATCH'], 'course-units/{courseUnit}', [CourseUnitController::class, 'update'])
-        ->middleware('role:admin')
-        ->middleware('throttle:api')
-        ->name('course-units.update');
-    Route::delete('course-units/{courseUnit}', [CourseUnitController::class, 'destroy'])
-        ->middleware('role:admin')
-        ->middleware('throttle:api')
-        ->name('course-units.destroy');
+        ->name('units.by-course');
 
     Route::get('academic-years', [AcademicYearController::class, 'index'])
         ->middleware('role:admin')

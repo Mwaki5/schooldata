@@ -21,20 +21,25 @@ return new class extends Migration
             $table->unsignedSmallInteger('modules_taught')->nullable();
             $table->unsignedSmallInteger('taught_hours')->nullable();
             $table->decimal('credit_factor', 10, 2)->nullable();
+            $table->boolean('core')->default(true);
             $table->boolean('is_active')->default(true);
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
-            $table->softDeletes();
+            // Microsecond precision keeps deletions in distinct buckets so
+            // the unique index below never collides on a shared timestamp.
+            $table->softDeletes('deleted_at', 6);
 
-            // A course is delivered per curriculum; list a course's units
-            // within one curriculum by this pair.
+            // A course is delivered per curriculum, and a unit's code
+            // identifies it inside that pair: another course — or another
+            // curriculum of the same course — may reuse the same code for
+            // a genuinely different unit. Soft-deleted rows free their
+            // code for reuse, matching the app's soft-delete conventions
+            // everywhere else (MySQL has no partial indexes, so
+            // `deleted_at` joins the key instead).
+            $table->unique(['curriculum_id', 'course_id', 'code', 'deleted_at']);
+
             $table->index(['course_id', 'curriculum_id']);
-
-            // A unit's code identifies it inside its course; a different
-            // course may reuse the same code. Uniqueness is enforced by
-            // validation among live records only, so a soft-deleted code
-            // can be reused.
         });
     }
 

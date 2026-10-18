@@ -73,12 +73,12 @@ class Course extends Model
     }
 
     /**
-     * The unit assignments delivered under this course, one per
-     * curriculum. The master units themselves live on the units table.
+     * The units offered under this course, one record per curriculum
+     * the course runs under.
      */
-    public function assignments(): HasMany
+    public function units(): HasMany
     {
-        return $this->hasMany(CourseUnit::class);
+        return $this->hasMany(Unit::class);
     }
 
     /**

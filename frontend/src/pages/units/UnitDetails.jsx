@@ -1,4 +1,4 @@
-import { ArrowLeft, Link2, Pencil, Power, Trash2 } from 'lucide-react'
+import { ArrowLeft, Pencil, Power, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -30,7 +30,7 @@ export default function UnitDetails() {
   const [unit, setUnit] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
-  const [busyId, setBusyId] = useState(null) // unit or assignment being changed
+  const [busy, setBusy] = useState(false)
 
   // No synchronous setState: the effect's fetch reports through promise
   // callbacks, and `loading` starts as `true` for the initial render.
@@ -65,14 +65,20 @@ export default function UnitDetails() {
     load()
   }
 
-  const handleToggleUnit = async () => {
-    setBusyId('unit')
+  const handleToggleActive = async () => {
+    setBusy(true)
 
     try {
       await api.put(`/units/${unit.id}`, {
+        course_id: unit.course_id,
+        curriculum_id: unit.curriculum_id,
         code: unit.code,
         name: unit.name,
         description: unit.description,
+        modules_taught: unit.modules_taught,
+        taught_hours: unit.taught_hours,
+        credit_factor: unit.credit_factor,
+        core: unit.core,
         is_active: !unit.is_active,
       })
 
@@ -85,20 +91,20 @@ export default function UnitDetails() {
         error.response?.data?.message ?? 'Unable to update the unit.',
       )
     } finally {
-      setBusyId(null)
+      setBusy(false)
     }
   }
 
-  const handleDeleteUnit = async () => {
+  const handleDelete = async () => {
     if (
       !window.confirm(
-        `Delete the unit "${unit.name}"? It can only be deleted once it is no longer assigned to any course.`,
+        `Delete the unit "${unit.name}" (${unit.code})? Its code becomes available again inside this course and curriculum.`,
       )
     ) {
       return
     }
 
-    setBusyId('unit')
+    setBusy(true)
 
     try {
       await api.delete(`/units/${unit.id}`)
@@ -106,64 +112,11 @@ export default function UnitDetails() {
       toast.success(`Deleted unit "${unit.name}"`)
       navigate('/units')
     } catch (error) {
-      // The backend refuses while assignments exist and explains why.
       toast.error(
         error.response?.data?.message ?? 'Unable to delete the unit.',
       )
     } finally {
-      setBusyId(null)
-    }
-  }
-
-  const handleToggleAssignment = async (assignment) => {
-    setBusyId(assignment.id)
-
-    try {
-      await api.put(`/course-units/${assignment.id}`, {
-        course_id: assignment.course_id,
-        curriculum_id: assignment.curriculum_id,
-        core: assignment.core,
-        time_offered: assignment.time_offered,
-        taught_hours: assignment.taught_hours,
-        credit_factor: assignment.credit_factor,
-        is_active: !assignment.is_active,
-      })
-
-      toast.success(
-        `${unit.code} ${assignment.is_active ? 'deactivated in' : 'activated in'} ${assignment.course_name}`,
-      )
-      reload()
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ?? 'Unable to update the assignment.',
-      )
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const handleRemoveAssignment = async (assignment) => {
-    if (
-      !window.confirm(
-        `Remove ${unit.code} from ${assignment.course_name} (${assignment.curriculum_name})? The unit itself is kept.`,
-      )
-    ) {
-      return
-    }
-
-    setBusyId(assignment.id)
-
-    try {
-      await api.delete(`/course-units/${assignment.id}`)
-
-      toast.success(`Removed ${unit.code} from ${assignment.course_name}`)
-      reload()
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ?? 'Unable to remove the assignment.',
-      )
-    } finally {
-      setBusyId(null)
+      setBusy(false)
     }
   }
 
@@ -187,15 +140,12 @@ export default function UnitDetails() {
     )
   }
 
-  const assignments = unit.assignments ?? []
-
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <Link to="/units" className={buttonVariants({ variant: 'ghost' })}>
         <ArrowLeft aria-hidden="true" /> Back to units
       </Link>
 
-      {/* Master unit card: catalogue-level facts only. */}
       <Card className="py-8">
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
@@ -210,18 +160,14 @@ export default function UnitDetails() {
               {unit.description || 'No description provided.'}
             </CardDescription>
             <p className="text-xs text-muted-foreground">
-              {unit.assignments_count}{' '}
-              {unit.assignments_count === 1 ? 'assignment' : 'assignments'} across
-              courses and curricula
+              {unit.course?.code && (
+                <span className="mr-1.5 font-mono">{unit.course.code}</span>
+              )}
+              {unit.course?.name ?? 'Unknown course'} ·{' '}
+              {unit.curriculum?.name ?? 'Unknown curriculum'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              to={`/units/${unit.id}/assign`}
-              className={buttonVariants()}
-            >
-              <Link2 aria-hidden="true" /> Assign to Course
-            </Link>
             <Link
               to={`/units/${unit.id}/edit`}
               className={buttonVariants({ variant: 'outline' })}
@@ -230,143 +176,68 @@ export default function UnitDetails() {
             </Link>
             <Button
               variant="outline"
-              disabled={busyId === 'unit'}
-              onClick={handleToggleUnit}
+              disabled={busy}
+              onClick={handleToggleActive}
             >
               <Power aria-hidden="true" />
               {unit.is_active ? 'Deactivate' : 'Activate'}
             </Button>
-            <Button
-              variant="destructive"
-              disabled={busyId === 'unit'}
-              onClick={handleDeleteUnit}
-            >
+            <Button variant="destructive" disabled={busy} onClick={handleDelete}>
               <Trash2 aria-hidden="true" /> Delete
             </Button>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Assignment-specific facts live only here, never on the master. */}
       <Card>
         <CardHeader>
-          <CardTitle>Assignments</CardTitle>
+          <CardTitle>Teaching Load</CardTitle>
           <CardDescription>
-            Where this unit is taught. Every assignment carries its own core
-            flag, time offered, hours and credit factor.
+            How this unit is delivered inside its course and curriculum.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {assignments.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                This unit is not assigned to any course yet.
-              </p>
-              <Link
-                to={`/units/${unit.id}/assign`}
-                className={buttonVariants({ variant: 'outline' })}
-              >
-                <Link2 aria-hidden="true" /> Assign to Course
-              </Link>
+        <CardContent>
+          <dl className="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <dt className="text-muted-foreground">Core Unit</dt>
+              <dd className="mt-0.5 font-medium">
+                <span
+                  className={cn(
+                    'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                    unit.core
+                      ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                      : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {unit.core ? 'Core' : 'Elective'}
+                </span>
+              </dd>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">Course</th>
-                    <th className="pb-3 font-medium">Curriculum</th>
-                    <th className="pb-3 font-medium">Core</th>
-                    <th className="pb-3 font-medium">Time Offered</th>
-                    <th className="pb-3 font-medium">Hours</th>
-                    <th className="pb-3 font-medium">Credit</th>
-                    <th className="pb-3 font-medium">Status</th>
-                    <th className="pb-3 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {assignments.map((assignment) => (
-                    <tr key={assignment.id}>
-                      <td className="max-w-56 truncate py-3">
-                        {assignment.course_code && (
-                          <span className="mr-1.5 text-xs text-muted-foreground">
-                            {assignment.course_code}
-                          </span>
-                        )}
-                        {assignment.course_name}
-                      </td>
-                      <td className="max-w-40 truncate py-3 text-muted-foreground">
-                        {assignment.curriculum_name}
-                      </td>
-                      <td className="py-3">
-                        <span
-                          className={cn(
-                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                            assignment.core
-                              ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                              : 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {assignment.core ? 'Core' : 'Elective'}
-                        </span>
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {assignment.time_offered ?? '—'}
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {assignment.taught_hours ?? '—'}
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {assignment.credit_factor ?? '—'}
-                      </td>
-                      <td className="py-3">
-                        <StatusBadge active={assignment.is_active} />
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <Link
-                            to={`/course-units/${assignment.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                            title="Edit assignment"
-                            aria-label={`Edit ${unit.code} in ${assignment.course_name}`}
-                          >
-                            <Pencil aria-hidden="true" />
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busyId === assignment.id}
-                            title={
-                              assignment.is_active
-                                ? 'Deactivate assignment'
-                                : 'Activate assignment'
-                            }
-                            aria-label={`${assignment.is_active ? 'Deactivate' : 'Activate'} ${unit.code} in ${assignment.course_name}`}
-                            onClick={() => handleToggleAssignment(assignment)}
-                          >
-                            <Power aria-hidden="true" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busyId === assignment.id}
-                            title="Remove assignment"
-                            aria-label={`Remove ${unit.code} from ${assignment.course_name}`}
-                            onClick={() => handleRemoveAssignment(assignment)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              <dt className="text-muted-foreground">Modules Taught</dt>
+              <dd className="mt-0.5 font-medium">
+                {unit.modules_taught ?? '—'}
+              </dd>
             </div>
-          )}
+            <div>
+              <dt className="text-muted-foreground">Training Hours</dt>
+              <dd className="mt-0.5 font-medium">
+                {unit.taught_hours ?? '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Credit Factor</dt>
+              <dd className="mt-0.5 font-medium">
+                {unit.credit_factor ?? '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Status</dt>
+              <dd className="mt-0.5 font-medium">
+                <StatusBadge active={unit.is_active} />
+              </dd>
+            </div>
+          </dl>
         </CardContent>
       </Card>
     </div>

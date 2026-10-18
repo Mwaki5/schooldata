@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Units\StoreUnitRequest;
 use App\Http\Requests\Units\UpdateUnitRequest;
 use App\Http\Resources\Units\UnitResource;
+use App\Models\Course;
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -18,36 +19,46 @@ class UnitController extends Controller
     use PaginatesLists;
 
     /**
-     * List the master unit catalogue with the shared
-     * search / sort / pagination contract.
+     * List unit offerings with the shared search / sort / pagination
+     * contract, filterable down to one course and curriculum.
      *
-     * Each unit appears exactly once no matter how many courses or
-     * curricula it is assigned to; `assignments_count` carries its
-     * number of live deliveries.
+     * Each row is one delivery of a unit inside a course + curriculum
+     * pair; the same code may appear once per pair.
      */
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
+            'course_id' => ['nullable', 'integer'],
+            'curriculum_id' => ['nullable', 'integer'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $paginator = $this->paginateList(
             $request,
-            Unit::query()->withCount('assignments'),
+            Unit::query()->with(['course.certificationLevel', 'course.department', 'curriculum.examBody']),
             searchable: ['code', 'name', 'description'],
             sortable: [
                 'code' => 'code',
                 'name' => 'name',
-                'assignments_count' => 'assignments_count',
+                'course_id' => 'course_id',
                 'is_active' => 'is_active',
                 'created_at' => 'created_at',
             ],
             defaultOrder: [['name', 'asc']],
             applyFilters: function (Builder $query) use ($filters): void {
-                $query->when(
-                    array_key_exists('is_active', $filters) && $filters['is_active'] !== null,
-                    fn ($query) => $query->where('is_active', (bool) $filters['is_active']),
-                );
+                $query
+                    ->when(
+                        ! empty($filters['course_id']),
+                        fn ($query) => $query->where('course_id', (int) $filters['course_id']),
+                    )
+                    ->when(
+                        ! empty($filters['curriculum_id']),
+                        fn ($query) => $query->where('curriculum_id', (int) $filters['curriculum_id']),
+                    )
+                    ->when(
+                        array_key_exists('is_active', $filters) && $filters['is_active'] !== null,
+                        fn ($query) => $query->where('is_active', (bool) $filters['is_active']),
+                    );
             },
         );
 
@@ -58,10 +69,9 @@ class UnitController extends Controller
     }
 
     /**
-     * Create a new master unit, stamping the creating user.
-     *
-     * Deliberately allows names that resemble existing units —
-     * duplicate detection is advisory (`duplicates()`), never a merge.
+     * Create a unit offering for one course + curriculum, stamping the
+     * creating user. The same code may already exist under a different
+     * course or curriculum; within this pair it must be unique.
      */
     public function store(StoreUnitRequest $request): JsonResponse
     {
@@ -72,29 +82,45 @@ class UnitController extends Controller
         ]);
 
         return response()->json([
-            'unit' => new UnitResource($unit->loadCount('assignments')),
+            'unit' => new UnitResource($unit->load(['course.certificationLevel', 'course.department', 'curriculum.examBody'])),
         ], Response::HTTP_CREATED);
     }
 
     /**
-     * Show a single master unit with all of its assignments.
+     * Show a single unit offering with its course and curriculum.
      */
     public function show(Unit $unit): JsonResponse
     {
         return response()->json([
-            'unit' => new UnitResource($unit->loadCount('assignments')->load([
-                'assignments.unit:id,name',
-                'assignments.course:id,code,name',
-                'assignments.curriculum:id,name',
-            ])),
+            'unit' => new UnitResource($unit->load(['course.certificationLevel', 'course.department', 'curriculum.examBody'])),
         ]);
     }
 
     /**
-     * Update a master unit, stamping the updating user.
-     *
-     * Renaming or deactivating the master never alters its assignments,
-     * whose teaching loads stand on their own.
+     * List every unit offered under one course — for reviewing what a
+     * course actually teaches, grouped by curriculum by the caller.
+     */
+    public function byCourse(Course $course): JsonResponse
+    {
+        $units = $course->units()
+            ->with('curriculum.examBody')
+            ->orderBy('id')
+            ->get()
+            // Sorted by curriculum name, which a portable SQL order
+            // cannot reach without joins; the collection is small.
+            ->sortBy([
+                fn (Unit $left, Unit $right) => strcasecmp($left->curriculum?->name ?? '', $right->curriculum?->name ?? ''),
+                fn (Unit $left, Unit $right) => strcasecmp($left->name, $right->name),
+            ])
+            ->values();
+
+        return response()->json([
+            'units' => UnitResource::collection($units),
+        ]);
+    }
+
+    /**
+     * Update a unit offering, stamping the updating user.
      */
     public function update(UpdateUnitRequest $request, Unit $unit): JsonResponse
     {
@@ -104,58 +130,18 @@ class UnitController extends Controller
         ]);
 
         return response()->json([
-            'unit' => new UnitResource($unit->refresh()->loadCount('assignments')),
+            'unit' => new UnitResource($unit->refresh()->load(['course.certificationLevel', 'course.department', 'curriculum.examBody'])),
         ]);
     }
 
     /**
-     * Soft delete a unit that has no assignments left.
-     *
-     * A unit still delivered by courses keeps its history: the caller
-     * is told to remove the assignments first instead of losing them.
+     * Soft delete a unit offering, freeing its code for reuse within
+     * the course + curriculum pair.
      */
-    public function destroy(Unit $unit): Response|JsonResponse
+    public function destroy(Unit $unit): Response
     {
-        if ($unit->assignments()->exists()) {
-            return response()->json([
-                'message' => 'This unit is still assigned to courses. Remove its assignments before deleting it.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
         $unit->delete();
 
         return response()->noContent();
-    }
-
-    /**
-     * Report master units whose names collide case-insensitively.
-     *
-     * Advisory only: nothing is merged automatically. The report includes
-     * soft-deleted masters so a "duplicate" that was already retired is
-     * still visible to whoever reviews the list.
-     */
-    public function duplicates(): JsonResponse
-    {
-        $groups = Unit::withTrashed()
-            ->selectRaw('LOWER(TRIM(name)) AS normalized_name, COUNT(*) AS total')
-            ->groupBy('normalized_name')
-            ->havingRaw('COUNT(*) > 1')
-            ->orderByDesc('total')
-            ->orderBy('normalized_name')
-            ->limit(50)
-            ->get();
-
-        $duplicates = $groups->map(fn ($group) => [
-            'normalized_name' => $group->normalized_name,
-            'total' => (int) $group->total,
-            'units' => UnitResource::collection(
-                Unit::withTrashed()
-                    ->whereRaw('LOWER(TRIM(name)) = ?', [$group->normalized_name])
-                    ->orderBy('id')
-                    ->get(),
-            ),
-        ]);
-
-        return response()->json(['duplicates' => $duplicates]);
     }
 }

@@ -29,8 +29,6 @@ const CourseUnits = lazy(() => import('@/pages/units/CourseUnits'))
 const Units = lazy(() => import('@/pages/units/Units'))
 const UnitForm = lazy(() => import('@/pages/units/UnitForm'))
 const UnitDetails = lazy(() => import('@/pages/units/UnitDetails'))
-const UnitAssignForm = lazy(() => import('@/pages/units/UnitAssignForm'))
-const CourseUnitForm = lazy(() => import('@/pages/units/CourseUnitForm'))
 const AcademicYears = lazy(() => import('@/pages/academic-years/AcademicYears'))
 const AcademicYearForm = lazy(() => import('@/pages/academic-years/AcademicYearForm'))
 const AcademicSessions = lazy(() => import('@/pages/academic-sessions/AcademicSessions'))
@@ -175,17 +173,8 @@ export default function App() {
             <Route path="/courses/:courseId/edit" element={<CourseForm />} />
             <Route path="/units" element={<Units />} />
             <Route path="/units/create" element={<UnitForm />} />
-            <Route path="/units/assign" element={<UnitAssignForm />} />
             <Route path="/units/:unitId" element={<UnitDetails />} />
             <Route path="/units/:unitId/edit" element={<UnitForm />} />
-            <Route
-              path="/units/:unitId/assign"
-              element={<UnitAssignForm />}
-            />
-            <Route
-              path="/course-units/:courseUnitId/edit"
-              element={<CourseUnitForm />}
-            />
             <Route path="/academic-years" element={<AcademicYears />} />
             <Route path="/academic-years/create" element={<AcademicYearForm />} />
             <Route

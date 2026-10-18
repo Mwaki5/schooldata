@@ -5,17 +5,17 @@ namespace App\Models;
 use Database\Factories\UnitFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
- * A reusable master unit of study: one catalogue entry (with its global
- * unit code) that can be assigned to any number of courses and
- * curricula. Everything that varies per delivery — the course and
- * curriculum it runs under and its teaching load — lives on the
- * CourseUnit assignment, not here.
+ * A unit of study as it is delivered inside one course + curriculum
+ * pair: its own record, so two courses (or two curricula of the same
+ * course) may use the same unit code for different units, and a
+ * curriculum change starts a fresh record. The code is unique within
+ * the (course, curriculum) pair among live rows only.
  */
 class Unit extends Model
 {
@@ -28,9 +28,15 @@ class Unit extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'course_id',
+        'curriculum_id',
         'code',
         'name',
         'description',
+        'modules_taught',
+        'taught_hours',
+        'credit_factor',
+        'core',
         'is_active',
         'created_by',
         'updated_by',
@@ -42,6 +48,7 @@ class Unit extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'core' => true,
         'is_active' => true,
     ];
 
@@ -53,16 +60,28 @@ class Unit extends Model
     protected function casts(): array
     {
         return [
+            'modules_taught' => 'integer',
+            'taught_hours' => 'integer',
+            'credit_factor' => 'decimal:2',
+            'core' => 'boolean',
             'is_active' => 'boolean',
         ];
     }
 
     /**
-     * The course + curriculum deliveries this unit is assigned to.
+     * The course this unit is delivered under.
      */
-    public function assignments(): HasMany
+    public function course(): BelongsTo
     {
-        return $this->hasMany(CourseUnit::class);
+        return $this->belongsTo(Course::class);
+    }
+
+    /**
+     * The curriculum this unit is delivered under.
+     */
+    public function curriculum(): BelongsTo
+    {
+        return $this->belongsTo(Curriculum::class);
     }
 
     /**
