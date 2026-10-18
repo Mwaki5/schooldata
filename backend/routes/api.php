@@ -4,6 +4,7 @@ use App\Http\Controllers\AcademicSessions\AcademicSessionController;
 use App\Http\Controllers\AcademicYears\AcademicYearController;
 use App\Http\Controllers\Activities\ActivityController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\PasswordUpdateController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CertificationLevels\CertificationLevelController;
 use App\Http\Controllers\Courses\CourseController;
@@ -55,6 +56,12 @@ Route::get('/user', function (Request $request): JsonResponse {
 |
 */
 Route::middleware(['auth:api', 'access.type'])->group(function () {
+    // Self-service: every signed-in user may change their own password,
+    // so unlike the routes below this one carries no `role:` gate.
+    Route::match(['PUT', 'PATCH'], 'profile/password', [PasswordUpdateController::class, 'update'])
+        ->middleware('throttle:api')
+        ->name('profile.password.update');
+
     Route::get('roles', [RoleController::class, 'index'])
         ->middleware('role:admin')
         ->middleware('throttle:api')

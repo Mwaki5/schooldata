@@ -11,6 +11,15 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import api, { loadErrorMessage, validationErrors } from '@/lib/api'
 
+/** Course options everywhere show "CODE — Name", matching StudentForm. */
+function courseLabel(course) {
+  if (!course) {
+    return ''
+  }
+
+  return course.code ? `${course.code} — ${course.name}` : course.name
+}
+
 export default function UnitForm() {
   const { unitId } = useParams()
   const isEdit = Boolean(unitId)
@@ -41,7 +50,10 @@ export default function UnitForm() {
             setUnit(loaded)
             setCourse(
               loaded.course_id
-                ? { id: loaded.course_id, name: loaded.course?.name ?? '' }
+                ? {
+                    id: loaded.course_id,
+                    name: courseLabel(loaded.course),
+                  }
                 : null,
             )
             setCurriculum(
@@ -84,7 +96,10 @@ export default function UnitForm() {
           .get(`/courses/${preselectedCourseId}`)
           .then(({ data }) => {
             if (active) {
-              setCourse({ id: data.course.id, name: data.course.name })
+              setCourse({
+                id: data.course.id,
+                name: courseLabel(data.course),
+              })
             }
           })
           .catch(() => {}),
@@ -220,18 +235,22 @@ export default function UnitForm() {
                   }
                   fetchOptions={(query, signal) =>
                     api
-                      .get('/courses', { params: { per_page: 100 }, signal })
+                      .get('/courses', {
+                        params: {
+                          per_page: 100,
+                          ...(query ? { search: query } : {}),
+                        },
+                        signal,
+                      })
                       .then(({ data }) =>
-                        data.courses
-                          .filter(
-                            (c) =>
-                              !query || c.name.toLowerCase().includes(query.toLowerCase()),
-                          )
-                          .map((c) => ({ id: c.id, name: c.name })),
+                        data.courses.map((c) => ({
+                          id: c.id,
+                          name: courseLabel(c),
+                        })),
                       )
                   }
                   placeholder="-- Choose a course --"
-                  searchPlaceholder="Type to find a course…"
+                  searchPlaceholder="Type a course code or name…"
                 />
               </FormField>
 
@@ -254,14 +273,18 @@ export default function UnitForm() {
                   }
                   fetchOptions={(query, signal) =>
                     api
-                      .get('/curricula', { params: { per_page: 100 }, signal })
+                      .get('/curricula', {
+                        params: {
+                          per_page: 100,
+                          ...(query ? { search: query } : {}),
+                        },
+                        signal,
+                      })
                       .then(({ data }) =>
-                        data.curricula
-                          .filter(
-                            (c) =>
-                              !query || c.name.toLowerCase().includes(query.toLowerCase()),
-                          )
-                          .map((c) => ({ id: c.id, name: c.name })),
+                        data.curricula.map((c) => ({
+                          id: c.id,
+                          name: c.name,
+                        })),
                       )
                   }
                   placeholder="-- Choose a curriculum --"

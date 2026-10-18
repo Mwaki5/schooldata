@@ -277,6 +277,8 @@ export default function Units() {
                       />
                       <th className="pb-3 font-medium">Course</th>
                       <th className="pb-3 font-medium">Curriculum</th>
+                      <th className="pb-3 font-medium">Core</th>
+                      <th className="pb-3 font-medium">Modules</th>
                       <th className="pb-3 font-medium">Hours</th>
                       <th className="pb-3 font-medium">Credit</th>
                       <SortableTh
@@ -313,6 +315,21 @@ export default function Units() {
                         </td>
                         <td className="max-w-40 truncate py-3 text-muted-foreground">
                           {unit.curriculum?.name ?? '—'}
+                        </td>
+                        <td className="py-3">
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                              unit.core
+                                ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                                : 'bg-muted text-muted-foreground',
+                            )}
+                          >
+                            {unit.core ? 'Core' : 'Elective'}
+                          </span>
+                        </td>
+                        <td className="py-3 text-muted-foreground">
+                          {unit.modules_taught ?? '—'}
                         </td>
                         <td className="py-3 text-muted-foreground">
                           {unit.taught_hours ?? '—'}

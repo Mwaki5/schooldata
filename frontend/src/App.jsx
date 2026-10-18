@@ -39,6 +39,7 @@ const Students = lazy(() => import('@/pages/students/Students'))
 const StudentForm = lazy(() => import('@/pages/students/StudentForm'))
 const Enrolments = lazy(() => import('@/pages/enrolments/Enrolments'))
 const Activities = lazy(() => import('@/pages/activities/Activities'))
+const Profile = lazy(() => import('@/pages/profile/Profile'))
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -124,6 +125,8 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
+          {/* Any signed-in user may view their own profile data. */}
+          <Route path="/profile" element={<Profile />} />
           {/* Admin-only section: the backend applies the same
               `role:admin` middleware to every route below. */}
           <Route

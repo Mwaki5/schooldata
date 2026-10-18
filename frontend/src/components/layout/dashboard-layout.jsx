@@ -14,9 +14,10 @@ import {
   School,
   ShieldCheck,
   Sun,
+  User,
   Wallet,
 } from 'lucide-react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PageLoader from '@/components/page-loader'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
@@ -73,6 +74,7 @@ const NAV_ITEMS = [
 
 const PAGE_TITLES = {
   '/': 'Dashboard',
+  '/profile': 'Profile',
   '/roles': 'Roles',
   '/departments': 'Departments',
   '/exam-bodies': 'Exam Bodies',
@@ -138,8 +140,7 @@ function Sidebar({
   onToggleCollapsed,
   onCloseMobile,
 }) {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const location = useLocation()
 
   /**
@@ -167,12 +168,6 @@ function Sidebar({
     if (collapsed) {
       onToggleCollapsed()
     }
-  }
-
-  const handleLogout = async () => {
-    await logout()
-
-    navigate('/login', { replace: true })
   }
 
   const handleHeaderToggle = () => {
@@ -364,11 +359,14 @@ function Sidebar({
         })}
       </nav>
 
+      {/* Signed-in user's card — links to their own profile page. */}
       <div className="border-t border-sidebar-line p-3">
-        <div
+        <Link
+          to="/profile"
+          title="View profile"
           className={cn(
-            'flex items-center',
-            railCollapsed ? 'flex-col gap-2 py-1' : 'gap-3 px-2 py-1.5',
+            'flex items-center rounded-lg transition-colors hover:bg-white/[0.04]',
+            railCollapsed ? 'flex-col gap-2 px-1 py-2' : 'gap-3 px-2 py-1.5',
           )}
         >
           <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-white">
@@ -380,16 +378,7 @@ function Sidebar({
             </p>
             <p className="truncate text-xs text-sidebar-subtle">{user?.email}</p>
           </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            title="Sign out"
-            aria-label="Sign out"
-            className="shrink-0 rounded-lg p-2 text-sidebar-text transition-colors hover:bg-white/10 hover:text-white"
-          >
-            <LogOut className="size-[18px]" aria-hidden="true" />
-          </button>
-        </div>
+        </Link>
       </div>
     </aside>
   )
@@ -495,7 +484,9 @@ function NavGroup({
 
 function Navbar({ isMobile, onOpenMobile }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
+  const { user, logout } = useAuth()
 
   const title = pageTitleFor(location.pathname)
   const today = new Date().toLocaleDateString(undefined, {
@@ -504,6 +495,12 @@ function Navbar({ isMobile, onOpenMobile }) {
     month: 'long',
     day: 'numeric',
   })
+
+  const handleLogout = async () => {
+    await logout()
+
+    navigate('/login', { replace: true })
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:px-6">
@@ -538,6 +535,25 @@ function Navbar({ isMobile, onOpenMobile }) {
           ) : (
             <Moon className="size-[18px]" aria-hidden="true" />
           )}
+        </button>
+        <Link
+          to="/profile"
+          title="View profile"
+          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <User className="size-[18px]" aria-hidden="true" />
+          <span className="hidden max-w-[140px] truncate text-sm md:inline">
+            {user?.name ?? 'Profile'}
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Sign out"
+          aria-label="Sign out"
+          className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <LogOut className="size-[18px]" aria-hidden="true" />
         </button>
       </div>
     </header>
