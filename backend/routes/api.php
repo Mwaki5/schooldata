@@ -13,9 +13,11 @@ use App\Http\Controllers\Departments\DepartmentController;
 use App\Http\Controllers\Enrolments\EnrolmentController;
 use App\Http\Controllers\ExamBodies\ExamBodyController;
 use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
+use App\Http\Controllers\Me\DashboardController;
 use App\Http\Controllers\Roles\RoleController;
 use App\Http\Controllers\Staff\StaffController;
 use App\Http\Controllers\Students\StudentController;
+use App\Http\Controllers\TermEvents\TermEventController;
 use App\Http\Controllers\Units\UnitController;
 use App\Http\Controllers\Users\UserController;
 use App\Http\Resources\UserResource;
@@ -61,6 +63,14 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
     Route::match(['PUT', 'PATCH'], 'profile/password', [PasswordUpdateController::class, 'update'])
         ->middleware('throttle:api')
         ->name('profile.password.update');
+
+    // The student's own dashboard: profile, academic calendar and
+    // enrolments for the signed-in account only, so it is gated to the
+    // student role rather than the admin one.
+    Route::get('me/dashboard', [DashboardController::class, '__invoke'])
+        ->middleware('role:student')
+        ->middleware('throttle:api')
+        ->name('me.dashboard');
 
     Route::get('roles', [RoleController::class, 'index'])
         ->middleware('role:admin')
@@ -265,6 +275,27 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('academic-sessions.destroy');
+
+    Route::get('term-events', [TermEventController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('term-events.index');
+    Route::post('term-events', [TermEventController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('term-events.store');
+    Route::get('term-events/{termEvent}', [TermEventController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('term-events.show');
+    Route::match(['PUT', 'PATCH'], 'term-events/{termEvent}', [TermEventController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('term-events.update');
+    Route::delete('term-events/{termEvent}', [TermEventController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('term-events.destroy');
 
     Route::get('staff', [StaffController::class, 'index'])
         ->middleware('role:admin')

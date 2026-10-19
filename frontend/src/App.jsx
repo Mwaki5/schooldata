@@ -33,6 +33,8 @@ const AcademicYears = lazy(() => import('@/pages/academic-years/AcademicYears'))
 const AcademicYearForm = lazy(() => import('@/pages/academic-years/AcademicYearForm'))
 const AcademicSessions = lazy(() => import('@/pages/academic-sessions/AcademicSessions'))
 const AcademicSessionForm = lazy(() => import('@/pages/academic-sessions/AcademicSessionForm'))
+const TermEvents = lazy(() => import('@/pages/term-events/TermEvents'))
+const TermEventForm = lazy(() => import('@/pages/term-events/TermEventForm'))
 const Staff = lazy(() => import('@/pages/staff/Staff'))
 const StaffForm = lazy(() => import('@/pages/staff/StaffForm'))
 const Students = lazy(() => import('@/pages/students/Students'))
@@ -192,6 +194,12 @@ export default function App() {
             <Route
               path="/academic-sessions/:sessionId/edit"
               element={<AcademicSessionForm />}
+            />
+            <Route path="/term-events" element={<TermEvents />} />
+            <Route path="/term-events/create" element={<TermEventForm />} />
+            <Route
+              path="/term-events/:eventId/edit"
+              element={<TermEventForm />}
             />
             <Route path="/staff" element={<Staff />} />
             <Route path="/staff/create" element={<StaffForm />} />

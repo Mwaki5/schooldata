@@ -65,6 +65,7 @@ const NAV_ITEMS = [
     children: [
       { label: 'Academic Year', to: '/academic-years', roles: ['admin'] },
       { label: 'Academic Session', to: '/academic-sessions', roles: ['admin'] },
+      { label: 'Term Events', to: '/term-events', roles: ['admin'] },
     ],
   },
   { label: 'Attendance', icon: CalendarCheck, disabled: true },
@@ -85,6 +86,7 @@ const PAGE_TITLES = {
   '/units': 'Units',
   '/academic-years': 'Academic Years',
   '/academic-sessions': 'Academic Sessions',
+  '/term-events': 'Term Events',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',
