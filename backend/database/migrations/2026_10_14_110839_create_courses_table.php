@@ -16,7 +16,12 @@ return new class extends Migration
             $table->string('code', 50);
             $table->string('initials', 20);
             $table->string('name');
-            $table->unsignedSmallInteger('duration_months')->nullable();
+            // The ladder length in modules (sessions of study): three
+            // modules make one academic year.
+            $table->unsignedSmallInteger('total_modules')->nullable();
+            // The minimum entry grade sought from the leaving certificate,
+            // stored as free text so any grading vocabulary fits.
+            $table->string('entry_grade', 50)->nullable();
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->foreignId('certification_level_id')->nullable()->constrained('certification_levels')->nullOnDelete();

@@ -65,6 +65,11 @@ class UpdateStudentRequest extends FormRequest
                 'integer',
                 Rule::exists('courses', 'id')->whereNull('deleted_at'),
             ],
+            'enrolment.course_stage_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('course_stages', 'id'),
+            ],
             'enrolment.curriculum_id' => [
                 'required',
                 'integer',

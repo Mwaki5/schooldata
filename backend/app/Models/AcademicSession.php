@@ -6,6 +6,7 @@ use Database\Factories\AcademicSessionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -59,6 +60,22 @@ class AcademicSession extends Model
     public function academicYear(): BelongsTo
     {
         return $this->belongsTo(AcademicYear::class);
+    }
+
+    /**
+     * The course stages explicitly opened (or withdrawn) in this session.
+     */
+    public function stageOfferings(): HasMany
+    {
+        return $this->hasMany(SessionStageOffering::class);
+    }
+
+    /**
+     * The "report session" registrations recorded for this session.
+     */
+    public function registrations(): HasMany
+    {
+        return $this->hasMany(AcademicSessionRegistration::class);
     }
 
     /**

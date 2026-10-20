@@ -41,7 +41,8 @@ class UpdateCourseRequest extends FormRequest
                     ->whereNull('deleted_at')
                     ->ignore($this->route('course')->id),
             ],
-            'duration_months' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'total_modules' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'entry_grade' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
             'certification_level_id' => [

@@ -318,13 +318,13 @@ export default function UnitForm() {
 
               <FormField
                 id="modules_taught"
-                label="Modules Taught"
+                label="Module"
                 name="modules_taught"
                 type="number"
                 min={0}
                 max={32767}
                 defaultValue={unit?.modules_taught ?? ''}
-                placeholder="e.g. 8"
+                placeholder="e.g. 2"
                 error={errors.modules_taught}
               />
 

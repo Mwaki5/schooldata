@@ -42,6 +42,8 @@ const StudentForm = lazy(() => import('@/pages/students/StudentForm'))
 const Enrolments = lazy(() => import('@/pages/enrolments/Enrolments'))
 const Activities = lazy(() => import('@/pages/activities/Activities'))
 const Profile = lazy(() => import('@/pages/profile/Profile'))
+const MyUnits = lazy(() => import('@/pages/my-units/MyUnits'))
+const OpenSession = lazy(() => import('@/pages/session-offerings/OpenSession'))
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -129,6 +131,17 @@ export default function App() {
           <Route index element={<Dashboard />} />
           {/* Any signed-in user may view their own profile data. */}
           <Route path="/profile" element={<Profile />} />
+          {/* Student-only section: the backend applies the same
+              `role:student` middleware to these routes. */}
+          <Route
+            element={
+              <RoleRoute roles={['student']}>
+                <Outlet />
+              </RoleRoute>
+            }
+          >
+            <Route path="/my-units" element={<MyUnits />} />
+          </Route>
           {/* Admin-only section: the backend applies the same
               `role:admin` middleware to every route below. */}
           <Route
@@ -195,6 +208,7 @@ export default function App() {
               path="/academic-sessions/:sessionId/edit"
               element={<AcademicSessionForm />}
             />
+            <Route path="/session-offerings" element={<OpenSession />} />
             <Route path="/term-events" element={<TermEvents />} />
             <Route path="/term-events/create" element={<TermEventForm />} />
             <Route

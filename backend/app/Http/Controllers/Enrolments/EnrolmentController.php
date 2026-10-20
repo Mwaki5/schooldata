@@ -22,7 +22,7 @@ class EnrolmentController extends Controller
      *
      * @var list<string>
      */
-    private const LOADS = ['student.user', 'course', 'curriculum', 'academicSession', 'certificationLevel'];
+    private const LOADS = ['student.user', 'course', 'courseStage', 'curriculum', 'academicSession', 'certificationLevel'];
 
     /**
      * List course enrolments newest first, with the shared search / sort /

@@ -174,83 +174,92 @@ export default function Enrolments() {
             </p>
           ) : (
             <>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">Student</th>
-                    <th className="pb-3 font-medium">Course</th>
-                    <th className="pb-3 font-medium">Curriculum</th>
-                    <th className="pb-3 font-medium">Session</th>
-                    <th className="pb-3 font-medium">Level</th>
-                    <SortableTh
-                      column="enrolment_date"
-                      label="Enrolled On"
-                      sort={sort}
-                      order={order}
-                      onSort={toggleSort}
-                    />
-                    <SortableTh
-                      column="status"
-                      label="Status"
-                      sort={sort}
-                      order={order}
-                      onSort={toggleSort}
-                    />
-                    <th className="pb-3 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {enrolments.map((enrolment) => (
-                    <tr key={enrolment.id}>
-                      <td className="py-3">
-                        <p className="font-medium">
-                          {enrolment.student_name ?? '—'}
-                        </p>
-                        {enrolment.student_login_id && (
-                          <p className="text-xs text-muted-foreground">
-                            {enrolment.student_login_id}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {enrolment.course_name
-                          ? `${enrolment.course_code} — ${enrolment.course_name}`
-                          : '—'}
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {enrolment.curriculum_name ?? '—'}
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {enrolment.academic_session_name ?? '—'}
-                      </td>
-                      <td className="py-3 text-muted-foreground">
-                        {enrolment.certification_level_name ?? '—'}
-                      </td>
-                      <td className="py-3 whitespace-nowrap text-muted-foreground">
-                        {formatDate(enrolment.enrolment_date)}
-                      </td>
-                      <td className="py-3">
-                        <StatusBadge status={enrolment.status} />
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === enrolment.id}
-                            onClick={() => handleDelete(enrolment)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === enrolment.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
-                        </div>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-3 font-medium">Student</th>
+                      <th className="pb-3 font-medium">Course</th>
+                      <th className="pb-3 font-medium">Curriculum</th>
+                      <th className="pb-3 font-medium">Session</th>
+                      <th className="pb-3 font-medium">Level</th>
+                      <SortableTh
+                        column="enrolment_date"
+                        label="Enrolled On"
+                        sort={sort}
+                        order={order}
+                        onSort={toggleSort}
+                      />
+                      <SortableTh
+                        column="status"
+                        label="Status"
+                        sort={sort}
+                        order={order}
+                        onSort={toggleSort}
+                      />
+                      <th className="pb-3 text-right font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {enrolments.map((enrolment) => (
+                      <tr key={enrolment.id}>
+                        <td className="py-3">
+                          <p className="font-medium">
+                            {enrolment.student_name ?? '—'}
+                          </p>
+                          {enrolment.student_login_id && (
+                            <p className="text-xs text-muted-foreground">
+                              {enrolment.student_login_id}
+                            </p>
+                          )}
+                        </td>
+                        <td className="py-3 text-muted-foreground">
+                          <p>
+                            {enrolment.course_name
+                              ? `${enrolment.course_code} — ${enrolment.course_name}`
+                              : '—'}
+                          </p>
+                          {enrolment.course_stage_code && (
+                            <p className="text-xs">
+                              Stage {enrolment.course_stage_code}
+                            </p>
+                          )}
+                        </td>
+                        <td className="py-3 text-muted-foreground">
+                          {enrolment.curriculum_name ?? '—'}
+                        </td>
+                        <td className="py-3 text-muted-foreground">
+                          {enrolment.academic_session_name ?? '—'}
+                        </td>
+                        <td className="py-3 text-muted-foreground">
+                          {enrolment.certification_level_name ?? '—'}
+                        </td>
+                        <td className="py-3 whitespace-nowrap text-muted-foreground">
+                          {formatDate(enrolment.enrolment_date)}
+                        </td>
+                        <td className="py-3">
+                          <StatusBadge status={enrolment.status} />
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === enrolment.id}
+                              onClick={() => handleDelete(enrolment)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === enrolment.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <ListPagination
                 meta={meta}

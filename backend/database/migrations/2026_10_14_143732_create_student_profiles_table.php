@@ -38,6 +38,16 @@ return new class extends Migration
             $table->string('disability_type', 100)->nullable();
             $table->text('disability_description')->nullable();
 
+            // Sponsorship: whether the student's fees are sponsored,
+            // and by whom (optional even when sponsored).
+            $table->boolean('sponsored')->default(false);
+            $table->string('sponsored_by', 150)->nullable();
+
+            // The KCPE/KCSE index number and year from the previous school.
+            $table->string('index_no', 50)->nullable();
+            $table->string('exam_year', 4)->nullable();
+            $table->string('previous_school', 150)->nullable();
+
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

@@ -65,11 +65,13 @@ class StudentResource extends JsonResource
         }
 
         $enrolment = $this->latestEnrolment;
-        $enrolment->loadMissing(['course', 'curriculum', 'academicSession', 'certificationLevel']);
+        $enrolment->loadMissing(['course', 'courseStage', 'curriculum', 'academicSession', 'certificationLevel']);
 
         return [
             'id' => $enrolment->id,
             'course_id' => $enrolment->course_id,
+            'course_stage_id' => $enrolment->course_stage_id,
+            'course_stage_code' => $enrolment->courseStage?->code,
             'curriculum_id' => $enrolment->curriculum_id,
             'academic_session_id' => $enrolment->academic_session_id,
             'certification_level_id' => $enrolment->certification_level_id,

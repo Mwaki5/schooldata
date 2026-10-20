@@ -18,6 +18,12 @@ return new class extends Migration
             // course under a particular exam-body curriculum.
             $table->foreignId('student_id')->constrained('student_profiles')->cascadeOnDelete();
             $table->foreignId('course_id')->constrained('courses');
+
+            // The stage a registration was accepted for. Nullable because
+            // enrolments that predate stage tracking (or that have no
+            // academic session) are still valid historical records.
+            $table->foreignId('course_stage_id')->nullable()->constrained('course_stages')->nullOnDelete();
+
             $table->foreignId('curriculum_id')->constrained('curricula');
 
             // Optional term the enrolment belongs to, and the certification

@@ -27,6 +27,8 @@ class EnrolmentResource extends JsonResource
             'course_id' => $this->course_id,
             'course_code' => $this->course?->code,
             'course_name' => $this->course?->name,
+            'course_stage_id' => $this->course_stage_id,
+            'course_stage_code' => $this->courseStage?->code,
             'curriculum_id' => $this->curriculum_id,
             'curriculum_name' => $this->curriculum?->name,
             'academic_session_id' => $this->academic_session_id,

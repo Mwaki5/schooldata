@@ -246,7 +246,7 @@ export default function CourseUnits() {
                     <tr className="border-b text-left text-muted-foreground">
                       <th className="pb-3 font-medium">Unit</th>
                       <th className="pb-3 font-medium">Core</th>
-                      <th className="pb-3 font-medium">Modules</th>
+                      <th className="pb-3 font-medium">Module</th>
                       <th className="pb-3 font-medium">Hours</th>
                       <th className="pb-3 font-medium">Credit</th>
                       <th className="pb-3 font-medium">Status</th>

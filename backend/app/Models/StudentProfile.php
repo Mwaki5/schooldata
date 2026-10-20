@@ -102,6 +102,14 @@ class StudentProfile extends Model
     }
 
     /**
+     * The "report session" registrations recorded for this student.
+     */
+    public function registrations(): HasMany
+    {
+        return $this->hasMany(AcademicSessionRegistration::class, 'student_id');
+    }
+
+    /**
      * Get the activity log configuration for the model: log the fillable
      * attributes on every change, but skip no-op updates.
      */

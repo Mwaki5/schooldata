@@ -278,7 +278,7 @@ export default function Units() {
                       <th className="pb-3 font-medium">Course</th>
                       <th className="pb-3 font-medium">Curriculum</th>
                       <th className="pb-3 font-medium">Core</th>
-                      <th className="pb-3 font-medium">Modules</th>
+                      <th className="pb-3 font-medium">Module</th>
                       <th className="pb-3 font-medium">Hours</th>
                       <th className="pb-3 font-medium">Credit</th>
                       <SortableTh

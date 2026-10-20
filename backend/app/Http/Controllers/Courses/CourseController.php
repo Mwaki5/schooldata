@@ -8,14 +8,18 @@ use App\Http\Requests\Courses\StoreCourseRequest;
 use App\Http\Requests\Courses\UpdateCourseRequest;
 use App\Http\Resources\Courses\CourseResource;
 use App\Models\Course;
+use App\Services\Offerings\CourseStageGenerator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class CourseController extends Controller
 {
     use PaginatesLists;
+
+    public function __construct(private readonly CourseStageGenerator $stageGenerator) {}
 
     /**
      * List courses ordered by name, with the shared search / sort /
@@ -36,7 +40,8 @@ class CourseController extends Controller
             sortable: [
                 'name' => 'name',
                 'code' => 'code',
-                'duration_months' => 'duration_months',
+                'total_modules' => 'total_modules',
+                'entry_grade' => 'entry_grade',
                 'is_active' => 'is_active',
                 'created_at' => 'created_at',
             ],
@@ -63,11 +68,19 @@ class CourseController extends Controller
      */
     public function store(StoreCourseRequest $request): JsonResponse
     {
-        $course = Course::create([
-            ...$request->validated(),
-            'created_by' => $request->user()->id,
-            'updated_by' => $request->user()->id,
-        ]);
+        $course = DB::transaction(function () use ($request): Course {
+            $course = Course::create([
+                ...$request->validated(),
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
+            ]);
+
+            // Every course gets its full progression ladder immediately;
+            // the backfill command covers courses created before this.
+            $this->stageGenerator->generate($course);
+
+            return $course;
+        });
 
         return response()->json([
             'course' => new CourseResource(
@@ -93,10 +106,20 @@ class CourseController extends Controller
      */
     public function update(UpdateCourseRequest $request, Course $course): JsonResponse
     {
-        $course->update([
-            ...$request->validated(),
-            'updated_by' => $request->user()->id,
-        ]);
+        $originalModules = $course->total_modules;
+
+        DB::transaction(function () use ($request, $course, $originalModules): void {
+            $course->update([
+                ...$request->validated(),
+                'updated_by' => $request->user()->id,
+            ]);
+
+            // Extending a course tops up its ladder. Shrinking it never
+            // deletes stages that already carry offerings or registrations.
+            if ($originalModules !== $course->total_modules) {
+                $this->stageGenerator->generate($course);
+            }
+        });
 
         return response()->json([
             'course' => new CourseResource(

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\OfferingStatus;
 use App\Enums\Role;
 use App\Models\AcademicSession;
 use App\Models\AcademicYear;
@@ -12,11 +13,13 @@ use App\Models\Curriculum;
 use App\Models\Department;
 use App\Models\ExamBody;
 use App\Models\ExamBodyGrade;
+use App\Models\SessionStageOffering;
 use App\Models\Staff;
 use App\Models\StudentProfile;
 use App\Models\TermEvent;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Offerings\CourseStageGenerator;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -256,7 +259,7 @@ class DemoDataSeeder extends Seeder
      * Programmes, each bound to a department, an award level and the
      * curriculum their units are written against.
      *
-     * @var array<string, array{initials: string, name: string, department: string|null, level: string, curriculum: string, duration_months: int, description: string}>
+     * @var array<string, array{initials: string, name: string, department: string|null, level: string, curriculum: string, total_modules: int, description: string}>
      */
     private const COURSES = [
         'DIT' => [
@@ -265,7 +268,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'computing',
             'level' => 'knec.diploma',
             'curriculum' => 'k_nec_diploma',
-            'duration_months' => 24,
+            'total_modules' => 6,
             'description' => 'Software, networking and data skills for the ICT industry.',
         ],
         'CIT' => [
@@ -274,7 +277,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'computing',
             'level' => 'knec.certificate',
             'curriculum' => 'k_nec_certificate',
-            'duration_months' => 12,
+            'total_modules' => 3,
             'description' => 'Foundational ICT support, networking and office productivity.',
         ],
         'DEEE' => [
@@ -283,7 +286,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'electrical',
             'level' => 'knec.diploma',
             'curriculum' => 'k_nec_diploma',
-            'duration_months' => 24,
+            'total_modules' => 6,
             'description' => 'Electrical power, machines and electronics engineering pathway.',
         ],
         'CEIE' => [
@@ -292,7 +295,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'electrical',
             'level' => 'knec.certificate',
             'curriculum' => 'k_nec_certificate',
-            'duration_months' => 12,
+            'total_modules' => 3,
             'description' => 'Domestic and industrial electrical installation skills.',
         ],
         'DFDT' => [
@@ -301,7 +304,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'fashion',
             'level' => 'cdacc.diploma',
             'curriculum' => 'cbet',
-            'duration_months' => 24,
+            'total_modules' => 6,
             'description' => 'Fashion design, garment construction and textile technology.',
         ],
         'CFDT' => [
@@ -310,7 +313,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'fashion',
             'level' => 'cdacc.certificate',
             'curriculum' => 'cbet',
-            'duration_months' => 12,
+            'total_modules' => 3,
             'description' => 'Garment construction and fashion essentials certificate.',
         ],
         'CBTH' => [
@@ -319,7 +322,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'cosmetology',
             'level' => 'cdacc.certificate',
             'curriculum' => 'cbet',
-            'duration_months' => 12,
+            'total_modules' => 3,
             'description' => 'Beauty therapy, hairdressing and salon practice.',
         ],
         'DSWCD' => [
@@ -328,7 +331,7 @@ class DemoDataSeeder extends Seeder
             'department' => 'social',
             'level' => 'knec.diploma',
             'curriculum' => 'k_nec_diploma',
-            'duration_months' => 24,
+            'total_modules' => 6,
             'description' => 'Community development and social work practice.',
         ],
         'AEM' => [
@@ -337,7 +340,7 @@ class DemoDataSeeder extends Seeder
             'department' => null,
             'level' => 'knec.artisan',
             'curriculum' => 'k_nec_artisan',
-            'duration_months' => 6,
+            'total_modules' => 3,
             'description' => 'Basic masonry and building construction trade skills.',
         ],
     ];
@@ -734,6 +737,8 @@ class DemoDataSeeder extends Seeder
         $this->seedExamBodyGrades($bodies);
         $curricula = $this->seedCurricula($bodies);
         $courses = $this->seedCourses($departments, $levels);
+        $this->seedCourseStages($courses);
+        $this->seedSessionOfferings($courses);
         $this->seedUnits($courses, $curricula);
         $this->seedStudents($courses, $curricula, $levels, $sessions);
         $this->seedStaff($departments);
@@ -980,7 +985,7 @@ class DemoDataSeeder extends Seeder
                 [
                     'initials' => $definition['initials'],
                     'name' => $definition['name'],
-                    'duration_months' => $definition['duration_months'],
+                    'total_modules' => $definition['total_modules'],
                     'description' => $definition['description'],
                     'is_active' => true,
                     'department_id' => isset($departments[$definition['department']])
@@ -998,6 +1003,65 @@ class DemoDataSeeder extends Seeder
         $this->command?->info('Courses: '.count($courses).' ensured.');
 
         return $courses;
+    }
+
+    /**
+     * Build the progression ladder for every demo course.
+     *
+     * @param  array<string, Course>  $courses
+     */
+    private function seedCourseStages(array $courses): void
+    {
+        $generator = app(CourseStageGenerator::class);
+        $created = 0;
+
+        foreach ($courses as $course) {
+            $created += $generator->generate($course);
+        }
+
+        $this->command?->info("Course stages: {$created} created.");
+    }
+
+    /**
+     * Open the first stage of every demo course in the active session so
+     * the registration flow is usable straight after a fresh seed. Later
+     * stages stay absent (closed), as the design requires.
+     *
+     * @param  array<string, Course>  $courses
+     */
+    private function seedSessionOfferings(array $courses): void
+    {
+        $session = AcademicSession::query()->where('is_active', true)->first();
+
+        if (! $session) {
+            return;
+        }
+
+        $count = 0;
+
+        foreach ($courses as $course) {
+            $stage = $course->stages()->where('module_no', 1)->first();
+
+            if (! $stage) {
+                continue;
+            }
+
+            SessionStageOffering::query()->firstOrCreate(
+                [
+                    'academic_session_id' => $session->id,
+                    'course_stage_id' => $stage->id,
+                ],
+                [
+                    'status' => OfferingStatus::Open,
+                    'created_by' => $this->adminId,
+                    'updated_by' => $this->adminId,
+                ],
+            );
+
+            $count++;
+        }
+
+        $this->command?->info("Session offerings: {$count} first-stage places ensured.");
     }
 
     /**

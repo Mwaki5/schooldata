@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Students;
 
 use App\Enums\Role;
+use App\Enums\StageOpenReason;
 use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Students\StoreStudentRequest;
 use App\Http\Requests\Students\UpdateStudentRequest;
 use App\Http\Resources\Students\StudentResource;
+use App\Models\Course;
+use App\Models\CourseEnrolment;
 use App\Models\StudentProfile;
 use App\Models\User;
+use App\Services\Offerings\OfferingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +26,8 @@ use Illuminate\Validation\ValidationException;
 class StudentController extends Controller
 {
     use PaginatesLists;
+
+    public function __construct(private readonly OfferingService $offerings) {}
 
     /**
      * The identity keys of the student payload: stored on the profile row.
@@ -46,6 +52,7 @@ class StudentController extends Controller
     private const LOADS = [
         'user',
         'latestEnrolment.course',
+        'latestEnrolment.courseStage',
         'latestEnrolment.curriculum',
         'latestEnrolment.academicSession',
         'latestEnrolment.certificationLevel',
@@ -270,6 +277,8 @@ class StudentController extends Controller
      */
     private function createEnrolment(StudentProfile $student, array $enrolment, int $userId): void
     {
+        $enrolment = $this->prepareRegistration($enrolment, null);
+
         $student->enrolments()->create([
             ...$enrolment,
             'created_by' => $userId,
@@ -283,7 +292,7 @@ class StudentController extends Controller
      */
     private function updateEnrolment(StudentProfile $student, array $enrolment, int $userId): void
     {
-        $current = $student->enrolments()->latest('id')->first();
+        $current = $student->enrolments()->with('courseStage')->latest('id')->first();
 
         if (! $current) {
             $this->createEnrolment($student, $enrolment, $userId);
@@ -291,10 +300,70 @@ class StudentController extends Controller
             return;
         }
 
+        $courseChanged = (int) $enrolment['course_id'] !== $current->course_id;
+        $sessionChanged = ($enrolment['academic_session_id'] ?? null) !== $current->academic_session_id;
+        $stageChanged = array_key_exists('course_stage_id', $enrolment)
+            && $enrolment['course_stage_id'] !== null
+            && (int) $enrolment['course_stage_id'] !== $current->course_stage_id;
+
+        // Editing a profile or a remark is not a registration. Only a
+        // course, session or stage move runs the offering check again.
+        if ($courseChanged || $sessionChanged || $stageChanged) {
+            $enrolment = $this->prepareRegistration($enrolment, $current);
+        } else {
+            unset($enrolment['course_stage_id']);
+        }
+
         $current->update([
             ...$enrolment,
             'updated_by' => $userId,
         ]);
+    }
+
+    /**
+     * Resolve the stage a registration targets and enforce the one
+     * availability check shared by every registration path.
+     *
+     * @param  array<string, mixed>  $enrolment
+     * @return array<string, mixed>
+     */
+    private function prepareRegistration(array $enrolment, ?CourseEnrolment $current): array
+    {
+        $academicSessionId = $enrolment['academic_session_id'] ?? null;
+
+        // Historical/practical registrations without a session carry no
+        // stage: there is no window to evaluate.
+        if ($academicSessionId === null) {
+            return $enrolment;
+        }
+
+        $course = Course::query()->findOrFail($enrolment['course_id']);
+
+        $stage = $this->offerings->resolveTargetStage(
+            $course,
+            $current,
+            (int) $academicSessionId,
+            isset($enrolment['course_stage_id']) ? (int) $enrolment['course_stage_id'] : null,
+        );
+
+        $result = $this->offerings->isStageOpen((int) $academicSessionId, $stage->id);
+
+        if (! $result->open) {
+            $message = match ($result->reason) {
+                StageOpenReason::NoRegistrationWindow => 'Registration dates are not configured for this session.',
+                StageOpenReason::NotYetOpen => 'Registration for this session has not opened yet.',
+                StageOpenReason::WindowEnded => 'Registration for this session has closed.',
+                default => "{$stage->code} is not open for this session.",
+            };
+
+            throw ValidationException::withMessages([
+                'enrolment.course_stage_id' => $message,
+            ]);
+        }
+
+        $enrolment['course_stage_id'] = $stage->id;
+
+        return $enrolment;
     }
 
     /**

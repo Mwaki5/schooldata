@@ -25,7 +25,8 @@ class Course extends Model
         'code',
         'initials',
         'name',
-        'duration_months',
+        'total_modules',
+        'entry_grade',
         'description',
         'is_active',
         'certification_level_id',
@@ -51,7 +52,7 @@ class Course extends Model
     protected function casts(): array
     {
         return [
-            'duration_months' => 'integer',
+            'total_modules' => 'integer',
             'is_active' => 'boolean',
         ];
     }
@@ -79,6 +80,14 @@ class Course extends Model
     public function units(): HasMany
     {
         return $this->hasMany(Unit::class);
+    }
+
+    /**
+     * The course's progression stages (Y1S1 … up to the final year).
+     */
+    public function stages(): HasMany
+    {
+        return $this->hasMany(CourseStage::class)->orderBy('module_no');
     }
 
     /**

@@ -37,7 +37,8 @@ class StoreCourseRequest extends FormRequest
                 'max:255',
                 Rule::unique('courses', 'name')->whereNull('deleted_at'),
             ],
-            'duration_months' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'total_modules' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'entry_grade' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
             'certification_level_id' => [

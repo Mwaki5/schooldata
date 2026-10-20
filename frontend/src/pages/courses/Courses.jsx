@@ -128,12 +128,13 @@ export default function Courses() {
                       onSort={toggleSort}
                     />
                     <SortableTh
-                      column="duration_months"
-                      label="Duration"
+                      column="total_modules"
+                      label="Modules"
                       sort={sort}
                       order={order}
                       onSort={toggleSort}
                     />
+                    <th className="pb-3 font-medium">Entry grade</th>
                     <th className="pb-3 font-medium">Certification Level</th>
                     <th className="pb-3 font-medium">Department</th>
                     <SortableTh
@@ -153,9 +154,12 @@ export default function Courses() {
                       <td className="py-3 text-muted-foreground">{course.initials}</td>
                       <td className="py-3 font-medium">{course.name}</td>
                       <td className="py-3 text-muted-foreground">
-                        {course.duration_months != null
-                          ? `${course.duration_months} mo`
+                        {course.total_modules != null
+                          ? `${course.total_modules}`
                           : '—'}
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {course.entry_grade ?? '—'}
                       </td>
                       <td className="py-3 text-muted-foreground">
                         {course.certification_level_name ?? '—'}

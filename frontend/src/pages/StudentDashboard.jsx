@@ -94,6 +94,7 @@ export default function StudentDashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [reporting, setReporting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -128,6 +129,42 @@ export default function StudentDashboard() {
   const year = data?.academic?.year ?? null
   const stats = data?.stats ?? { active: 0, completed: 0, courses: 0, units: 0 }
   const enrolments = data?.enrolments ?? []
+  const report = data?.report_session ?? null
+
+  // Record a "report session" registration. The endpoint only inserts a
+  // row; the enrolment itself is untouched.
+  const handleReport = async () => {
+    setReporting(true)
+
+    try {
+      const { data: response } = await api.post('/me/report-session')
+
+      toast.success(
+        `Reported for session: module ${response.registration.module_no} ` +
+          `(${response.registration.course_stage_code})`,
+      )
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              report_session: {
+                ...current.report_session,
+                can_report: false,
+                reason: 'You have already reported for this session.',
+              },
+            }
+          : current,
+      )
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ??
+          error.response?.data?.errors?.session?.[0] ??
+          'Unable to report for this session.',
+      )
+    } finally {
+      setReporting(false)
+    }
+  }
 
   const firstName =
     (profile?.first_name || user?.name || '').trim().split(' ')[0] || 'there'
@@ -172,13 +209,28 @@ export default function StudentDashboard() {
               <p className="font-medium">
                 {session?.name ?? 'No active term'}
               </p>
+              <p className="text-sm text-muted-foreground">
+                {year?.name ?? 'No active academic year'}
+                {session &&
+                  ` · ${formatDate(session.start_date)} – ${formatDate(session.end_date)}`}
+              </p>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {year?.name ?? 'No active academic year'}
-            {session &&
-              ` · ${formatDate(session.start_date)} – ${formatDate(session.end_date)}`}
-          </p>
+
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            <button
+              type="button"
+              onClick={handleReport}
+              disabled={!report?.can_report || reporting || loading}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ClipboardList className="h-4 w-4" aria-hidden="true" />
+              {reporting ? 'Reporting…' : 'Report Session'}
+            </button>
+            {!report?.can_report && report?.reason && (
+              <p className="text-xs text-muted-foreground">{report.reason}</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

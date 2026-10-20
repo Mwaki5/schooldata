@@ -14,7 +14,10 @@ use App\Http\Controllers\Enrolments\EnrolmentController;
 use App\Http\Controllers\ExamBodies\ExamBodyController;
 use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
 use App\Http\Controllers\Me\DashboardController;
+use App\Http\Controllers\Me\MyUnitsController;
+use App\Http\Controllers\Me\ReportSessionController;
 use App\Http\Controllers\Roles\RoleController;
+use App\Http\Controllers\SessionOfferings\SessionOfferingController;
 use App\Http\Controllers\Staff\StaffController;
 use App\Http\Controllers\Students\StudentController;
 use App\Http\Controllers\TermEvents\TermEventController;
@@ -71,6 +74,21 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:student')
         ->middleware('throttle:api')
         ->name('me.dashboard');
+
+    // The student's own units: everything offered by the courses they are
+    // enrolled in, grouped by course + curriculum on the server.
+    Route::get('me/units', MyUnitsController::class)
+        ->middleware('role:student')
+        ->middleware('throttle:api')
+        ->name('me.units');
+
+    // The student reporting for the running session: records which module
+    // of their course ladder they are registering for, once the Session
+    // Registration event is active and their stage is open.
+    Route::post('me/report-session', ReportSessionController::class)
+        ->middleware('role:student')
+        ->middleware('throttle:api')
+        ->name('me.report-session');
 
     Route::get('roles', [RoleController::class, 'index'])
         ->middleware('role:admin')
@@ -275,6 +293,17 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('academic-sessions.destroy');
+
+    // Opening a session is gated by the manage-session-offerings ability,
+    // not by a bare role check, so per-user grants can be added later.
+    Route::get('session-offerings', [SessionOfferingController::class, 'index'])
+        ->middleware('can:manage-session-offerings')
+        ->middleware('throttle:api')
+        ->name('session-offerings.index');
+    Route::patch('session-offerings/stage', [SessionOfferingController::class, 'toggle'])
+        ->middleware('can:manage-session-offerings')
+        ->middleware('throttle:api')
+        ->name('session-offerings.toggle');
 
     Route::get('term-events', [TermEventController::class, 'index'])
         ->middleware('role:admin')

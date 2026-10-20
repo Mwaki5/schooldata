@@ -1,13 +1,18 @@
 <?php
 
 use App\Enums\Role;
+use App\Enums\TermEventName;
 use App\Models\AcademicSession;
 use App\Models\CertificationLevel;
 use App\Models\Course;
 use App\Models\CourseEnrolment;
+use App\Models\CourseStage;
 use App\Models\Curriculum;
+use App\Models\SessionStageOffering;
 use App\Models\StudentProfile;
+use App\Models\TermEvent;
 use App\Models\User;
+use App\Services\Offerings\CourseStageGenerator;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 function studentsAccessTokenFor(User $user): string
@@ -15,6 +20,31 @@ function studentsAccessTokenFor(User $user): string
     JWTAuth::factory()->setTTL((int) config('jwt.ttl'));
 
     return JWTAuth::claims(['type' => 'access'])->fromUser($user);
+}
+
+/**
+ * Give the course its generated ladder and open its first stage in the
+ * session, so the registration path has a valid target.
+ */
+function openStudentRegistrationStage(Course $course, AcademicSession $session): CourseStage
+{
+    app(CourseStageGenerator::class)->generate($course);
+
+    $stage = $course->stages()->where('module_no', 1)->firstOrFail();
+
+    TermEvent::factory()->create([
+        'academic_session_id' => $session->id,
+        'name' => TermEventName::SessionRegistration,
+        'start_date' => now()->subDay()->toDateString(),
+        'end_date' => now()->addWeek()->toDateString(),
+    ]);
+
+    SessionStageOffering::factory()
+        ->for($session, 'academicSession')
+        ->for($stage, 'courseStage')
+        ->create();
+
+    return $stage;
 }
 
 test('student endpoints require an access token', function () {
@@ -122,6 +152,7 @@ test('creating a student provisions the account and auto-creates the profile', f
     $curriculum = Curriculum::factory()->create(['name' => 'NCC Curriculum']);
     $session = AcademicSession::factory()->create(['name' => 'Term 2 2026']);
     $level = CertificationLevel::factory()->create(['name' => 'Level 4']);
+    $stage = openStudentRegistrationStage($course, $session);
 
     $response = $this->withToken(studentsAccessTokenFor($creator))
         ->postJson('/api/students', [
@@ -163,6 +194,8 @@ test('creating a student provisions the account and auto-creates the profile', f
         ->assertJsonPath('student.exam_year', '2025')
         ->assertJsonPath('student.previous_school', 'Central Primary School')
         ->assertJsonPath('student.enrolment.course_id', $course->id)
+        ->assertJsonPath('student.enrolment.course_stage_id', $stage->id)
+        ->assertJsonPath('student.enrolment.course_stage_code', 'Y1S1')
         ->assertJsonPath('student.enrolment.curriculum_id', $curriculum->id)
         ->assertJsonPath('student.enrolment.academic_session_id', $session->id)
         ->assertJsonPath('student.enrolment.certification_level_id', $level->id)
@@ -209,6 +242,7 @@ test('creating a student provisions the account and auto-creates the profile', f
     $this->assertDatabaseHas('course_enrolments', [
         'student_id' => $response->json('student.id'),
         'course_id' => $course->id,
+        'course_stage_id' => $stage->id,
         'curriculum_id' => $curriculum->id,
         'academic_session_id' => $session->id,
         'certification_level_id' => $level->id,
@@ -558,4 +592,174 @@ test('a student update also updates their enrolment', function () {
 
     // The update moved onto the existing row instead of filing a second one.
     expect(CourseEnrolment::count())->toBe(1);
+});
+
+test('a registration for a stage with no offering is rejected', function () {
+    $creator = User::factory()->create();
+    $course = Course::factory()->create(['total_modules' => 3]);
+    $curriculum = Curriculum::factory()->create();
+    $session = AcademicSession::factory()->create();
+    $level = CertificationLevel::factory()->create();
+
+    app(CourseStageGenerator::class)->generate($course);
+
+    $this->withToken(studentsAccessTokenFor($creator))
+        ->postJson('/api/students', [
+            'admission_no' => 'ADM500',
+            'first_name' => 'Amina',
+            'last_name' => 'Otieno',
+            'enrolment' => [
+                'course_id' => $course->id,
+                'curriculum_id' => $curriculum->id,
+                'academic_session_id' => $session->id,
+                'certification_level_id' => $level->id,
+                'enrolment_date' => '2026-09-01',
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'enrolment.course_stage_id' => 'Y1S1 is not open for this session.',
+        ]);
+
+    $this->assertDatabaseMissing('users', ['login_id' => 'ADM500']);
+    $this->assertDatabaseMissing('student_profiles', ['user_id' => null, 'first_name' => 'Amina']);
+    expect(CourseEnrolment::count())->toBe(0);
+});
+
+test('a registration is rejected when the session has no registration event', function () {
+    $creator = User::factory()->create();
+    $course = Course::factory()->create(['total_modules' => 3]);
+    $curriculum = Curriculum::factory()->create();
+    $session = AcademicSession::factory()->create();
+    $level = CertificationLevel::factory()->create();
+
+    app(CourseStageGenerator::class)->generate($course);
+
+    $stage = $course->stages()->where('module_no', 1)->firstOrFail();
+
+    SessionStageOffering::factory()
+        ->for($session, 'academicSession')
+        ->for($stage, 'courseStage')
+        ->create();
+
+    $this->withToken(studentsAccessTokenFor($creator))
+        ->postJson('/api/students', [
+            'admission_no' => 'ADM502',
+            'first_name' => 'Amina',
+            'last_name' => 'Otieno',
+            'enrolment' => [
+                'course_id' => $course->id,
+                'curriculum_id' => $curriculum->id,
+                'academic_session_id' => $session->id,
+                'certification_level_id' => $level->id,
+                'enrolment_date' => '2026-09-01',
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'enrolment.course_stage_id' => 'Registration dates are not configured for this session.',
+        ]);
+
+    $this->assertDatabaseMissing('users', ['login_id' => 'ADM502']);
+    expect(CourseEnrolment::count())->toBe(0);
+});
+
+test('a registration is rejected with a clear message when the event window has ended', function () {
+    $creator = User::factory()->create();
+    $course = Course::factory()->create(['total_modules' => 3]);
+    $curriculum = Curriculum::factory()->create();
+    $session = AcademicSession::factory()->create();
+    $level = CertificationLevel::factory()->create();
+
+    openStudentRegistrationStage($course, $session);
+
+    $this->travelTo(now()->addDays(9));
+
+    $this->withToken(studentsAccessTokenFor($creator))
+        ->postJson('/api/students', [
+            'admission_no' => 'ADM503',
+            'first_name' => 'Amina',
+            'last_name' => 'Otieno',
+            'enrolment' => [
+                'course_id' => $course->id,
+                'curriculum_id' => $curriculum->id,
+                'academic_session_id' => $session->id,
+                'certification_level_id' => $level->id,
+                'enrolment_date' => '2026-09-01',
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'enrolment.course_stage_id' => 'Registration for this session has closed.',
+        ]);
+
+    $this->assertDatabaseMissing('users', ['login_id' => 'ADM503']);
+    expect(CourseEnrolment::count())->toBe(0);
+
+    $this->travelBack();
+});
+
+test('moving a student to a later session is rejected when the next stage is closed', function () {
+    $updater = User::factory()->create();
+    $student = StudentProfile::factory()->create([
+        'first_name' => 'Amina',
+        'middle_name' => null,
+        'last_name' => 'Otieno',
+        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM501']),
+    ]);
+
+    $course = Course::factory()->create(['total_modules' => 3]);
+    $stageOne = $course->stages()->create([
+        'module_no' => 1,
+        'year_no' => 1,
+        'session_no' => 1,
+        'code' => 'Y1S1',
+    ]);
+    $course->stages()->create([
+        'module_no' => 2,
+        'year_no' => 1,
+        'session_no' => 2,
+        'code' => 'Y1S2',
+    ]);
+
+    $firstSession = AcademicSession::factory()->create([
+        'start_date' => '2026-09-01',
+        'end_date' => '2026-12-18',
+    ]);
+    $secondSession = AcademicSession::factory()->create([
+        'start_date' => '2027-01-04',
+        'end_date' => '2027-04-09',
+    ]);
+
+    $enrolment = CourseEnrolment::factory()->create([
+        'student_id' => $student->id,
+        'course_id' => $course->id,
+        'course_stage_id' => $stageOne->id,
+        'academic_session_id' => $firstSession->id,
+        'status' => 'ENROLLED',
+    ]);
+
+    $this->withToken(studentsAccessTokenFor($updater))
+        ->putJson('/api/students/'.$student->id, [
+            'admission_no' => 'ADM501',
+            'first_name' => 'Amina',
+            'last_name' => 'Otieno',
+            'enrolment' => [
+                'course_id' => $course->id,
+                'curriculum_id' => $enrolment->curriculum_id,
+                'academic_session_id' => $secondSession->id,
+                'certification_level_id' => $enrolment->certification_level_id,
+                'enrolment_date' => '2027-01-04',
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([
+            'enrolment.course_stage_id' => 'Y1S2 is not open for this session.',
+        ]);
+
+    $this->assertDatabaseHas('course_enrolments', [
+        'id' => $enrolment->id,
+        'academic_session_id' => $firstSession->id,
+        'course_stage_id' => $stageOne->id,
+    ]);
 });

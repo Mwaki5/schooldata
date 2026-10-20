@@ -84,12 +84,13 @@ export default function CourseForm() {
     setSubmitting(true)
 
     const formData = new FormData(event.currentTarget)
-    const duration = formData.get('duration_months')
+    const modules = formData.get('total_modules')
     const payload = {
       code: String(formData.get('code') ?? '').trim().toUpperCase(),
       initials: String(formData.get('initials') ?? '').trim().toUpperCase(),
       name: String(formData.get('name') ?? '').trim(),
-      duration_months: duration === '' || duration == null ? null : Number(duration),
+      total_modules: modules === '' || modules == null ? null : Number(modules),
+      entry_grade: String(formData.get('entry_grade') ?? '').trim() || null,
       description: String(formData.get('description') ?? '').trim() || null,
       is_active: formData.get('is_active') === '1',
       certification_level_id: certificationLevel?.id ?? null,
@@ -197,15 +198,25 @@ export default function CourseForm() {
               />
 
               <FormField
-                id="duration_months"
-                label="Duration (months)"
-                name="duration_months"
+                id="total_modules"
+                label="Total modules"
+                name="total_modules"
                 type="number"
                 min={0}
                 max={65535}
-                defaultValue={course?.duration_months ?? ''}
-                placeholder="e.g. 24"
-                error={errors.duration_months}
+                defaultValue={course?.total_modules ?? ''}
+                placeholder="e.g. 6"
+                error={errors.total_modules}
+              />
+
+              <FormField
+                id="entry_grade"
+                label="Entry grade"
+                name="entry_grade"
+                defaultValue={course?.entry_grade ?? ''}
+                placeholder="e.g. C"
+                autoComplete="off"
+                error={errors.entry_grade}
               />
 
               {/* Certification Level with SearchableSelect (optional) */}

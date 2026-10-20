@@ -43,7 +43,7 @@ const NAV_ITEMS = [
   {
     label: 'Academics',
     icon: BookOpen,
-    roles: ['admin'],
+    roles: ['admin', 'student'],
     children: [
       { label: 'Students', to: '/students', roles: ['admin'] },
       { label: 'Enrolments', to: '/enrolments', roles: ['admin'] },
@@ -56,6 +56,9 @@ const NAV_ITEMS = [
       { label: 'Curriculum', to: '/curricula', roles: ['admin'] },
       { label: 'Courses', to: '/courses', roles: ['admin'] },
       { label: 'Units', to: '/units', roles: ['admin'] },
+      // Students only ever see their own course's units, never the
+      // admin catalogue.
+      { label: 'My Units', to: '/my-units', roles: ['student'] },
     ],
   },
   {
@@ -65,6 +68,7 @@ const NAV_ITEMS = [
     children: [
       { label: 'Academic Year', to: '/academic-years', roles: ['admin'] },
       { label: 'Academic Session', to: '/academic-sessions', roles: ['admin'] },
+      { label: 'Open Session', to: '/session-offerings', roles: ['admin'] },
       { label: 'Term Events', to: '/term-events', roles: ['admin'] },
     ],
   },
@@ -84,8 +88,10 @@ const PAGE_TITLES = {
   '/curricula': 'Curriculum',
   '/courses': 'Courses',
   '/units': 'Units',
+  '/my-units': 'My Units',
   '/academic-years': 'Academic Years',
   '/academic-sessions': 'Academic Sessions',
+  '/session-offerings': 'Open Session',
   '/term-events': 'Term Events',
   '/staff': 'Staff',
   '/students': 'Students',

@@ -24,6 +24,7 @@ class CourseEnrolment extends Model
     protected $fillable = [
         'student_id',
         'course_id',
+        'course_stage_id',
         'curriculum_id',
         'academic_session_id',
         'certification_level_id',
@@ -70,6 +71,15 @@ class CourseEnrolment extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    /**
+     * The progression stage this registration was accepted for, when the
+     * enrolment predates stage tracking this is null.
+     */
+    public function courseStage(): BelongsTo
+    {
+        return $this->belongsTo(CourseStage::class);
     }
 
     /**

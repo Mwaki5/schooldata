@@ -27,7 +27,7 @@ test('courses are listed ordered by name', function () {
         ->assertOk()
         ->assertJsonStructure([
             'courses' => [[
-                'id', 'code', 'initials', 'name', 'duration_months',
+                'id', 'code', 'initials', 'name', 'total_modules', 'entry_grade',
                 'description', 'is_active', 'certification_level_id',
                 'certification_level_name', 'department_id', 'department_name',
                 'created_by', 'updated_by',
@@ -86,7 +86,8 @@ test('a course can be created with audit stamps', function () {
             'code' => 'ND-IT',
             'initials' => 'IT',
             'name' => 'National Diploma in IT',
-            'duration_months' => 24,
+            'total_modules' => 6,
+            'entry_grade' => 'C',
             'description' => 'A two year diploma.',
             'is_active' => true,
         ]);
@@ -95,7 +96,8 @@ test('a course can be created with audit stamps', function () {
         ->assertJsonPath('course.code', 'ND-IT')
         ->assertJsonPath('course.initials', 'IT')
         ->assertJsonPath('course.name', 'National Diploma in IT')
-        ->assertJsonPath('course.duration_months', 24)
+        ->assertJsonPath('course.total_modules', 6)
+        ->assertJsonPath('course.entry_grade', 'C')
         ->assertJsonPath('course.is_active', true)
         ->assertJsonPath('course.created_by', $creator->id)
         ->assertJsonPath('course.updated_by', $creator->id);
@@ -119,7 +121,8 @@ test('a course defaults to active and tolerates null optional fields', function 
         ])
         ->assertCreated()
         ->assertJsonPath('course.is_active', true)
-        ->assertJsonPath('course.duration_months', null)
+        ->assertJsonPath('course.total_modules', null)
+        ->assertJsonPath('course.entry_grade', null)
         ->assertJsonPath('course.description', null)
         ->assertJsonPath('course.certification_level_id', null)
         ->assertJsonPath('course.department_id', null);
@@ -186,7 +189,7 @@ test('a soft deleted certification level cannot be linked', function () {
         ->assertJsonValidationErrors(['certification_level_id']);
 });
 
-test('duration months must be a non negative integer', function () {
+test('total modules must be a non negative integer', function () {
     $user = User::factory()->create();
 
     $this->withToken(coursesAccessTokenFor($user))
@@ -194,20 +197,20 @@ test('duration months must be a non negative integer', function () {
             'code' => 'X3',
             'initials' => 'X3',
             'name' => 'Course X3',
-            'duration_months' => 'two years',
+            'total_modules' => 'two years',
         ])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['duration_months']);
+        ->assertJsonValidationErrors(['total_modules']);
 
     $this->withToken(coursesAccessTokenFor($user))
         ->postJson('/api/courses', [
             'code' => 'X4',
             'initials' => 'X4',
             'name' => 'Course X4',
-            'duration_months' => -1,
+            'total_modules' => -1,
         ])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['duration_months']);
+        ->assertJsonValidationErrors(['total_modules']);
 });
 
 test('a course can be updated and stamps the updating user', function () {
@@ -223,14 +226,14 @@ test('a course can be updated and stamps the updating user', function () {
             'code' => $course->code,
             'initials' => 'BD',
             'name' => 'Bachelor of Data Science',
-            'duration_months' => 36,
+            'total_modules' => 9,
             'description' => 'Revised programme.',
             'is_active' => false,
         ])
         ->assertOk()
         ->assertJsonPath('course.name', 'Bachelor of Data Science')
         ->assertJsonPath('course.initials', 'BD')
-        ->assertJsonPath('course.duration_months', 36)
+        ->assertJsonPath('course.total_modules', 9)
         ->assertJsonPath('course.is_active', false)
         ->assertJsonPath('course.created_by', $creator->id)
         ->assertJsonPath('course.updated_by', $updater->id);

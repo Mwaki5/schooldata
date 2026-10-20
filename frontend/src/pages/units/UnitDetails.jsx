@@ -214,7 +214,7 @@ export default function UnitDetails() {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Modules Taught</dt>
+              <dt className="text-muted-foreground">Module</dt>
               <dd className="mt-0.5 font-medium">
                 {unit.modules_taught ?? '—'}
               </dd>
