@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Me;
 
 use App\Enums\EnrolmentStatus;
-use App\Enums\TermEventName;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Enrolments\EnrolmentResource;
 use App\Http\Resources\Students\StudentResource;
 use App\Models\AcademicSession;
+use App\Models\AcademicSessionRegistration;
 use App\Models\AcademicYear;
 use App\Models\CourseEnrolment;
-use App\Models\TermEvent;
-use App\Models\Unit;
+use App\Models\CourseUnit;
 use App\Services\Offerings\OfferingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -75,7 +74,7 @@ class DashboardController extends Controller
                 'courses' => $courseIds->count(),
                 'units' => $courseIds->isEmpty()
                     ? 0
-                    : Unit::query()->whereIn('course_id', $courseIds)->count(),
+                    : CourseUnit::query()->whereIn('course_id', $courseIds)->count(),
             ],
             'enrolments' => EnrolmentResource::collection($enrolments),
         ]);
@@ -84,56 +83,55 @@ class DashboardController extends Controller
     /**
      * Whether the signed-in student may report for the running session.
      *
-     * Reporting needs both: an active Session Registration term event on
-     * the session, and the stage the student's course sits at being open
-     * for that session. The reason is returned so the UI can explain why
-     * the button is unavailable.
+     * Reporting needs an open stage on the student's latest enrolment —
+     * the offering service applies the whole rule chain, including the
+     * active Session Registration window — and no registration recorded
+     * yet for this session. The reason is returned so the UI can explain
+     * why the button is unavailable, and the student's level (year and
+     * session of their current stage) travels with every state.
      *
-     * @return array{can_report: bool, reason: string|null, module_no: int|null, stage_code: string|null}
+     * @return array{can_report: bool, reason: string|null, module_no: int|null, year_no: int|null, session_no: int|null, stage_code: string|null}
      */
     private function reportSessionState($profile, ?AcademicSession $session): array
     {
-        $unavailable = fn (string $reason): array => [
-            'can_report' => false,
+        $stage = $profile?->latestEnrolment()->with('courseStage')->first()?->courseStage;
+
+        $state = fn (bool $canReport, ?string $reason = null, ?int $moduleNo = null): array => [
+            'can_report' => $canReport,
             'reason' => $reason,
-            'module_no' => null,
-            'stage_code' => null,
+            'module_no' => $moduleNo,
+            'year_no' => $stage?->year_no,
+            'session_no' => $stage?->session_no,
+            'stage_code' => $stage?->code,
         ];
 
         if (! $session) {
-            return $unavailable('There is no active academic session to report for.');
-        }
-
-        $event = TermEvent::query()
-            ->where('academic_session_id', $session->id)
-            ->where('name', TermEventName::SessionRegistration)
-            ->first();
-
-        if (! $event || ! $event->is_active) {
-            return $unavailable('Session registration is not open for this term.');
+            return $state(false, 'There is no active academic session to report for.');
         }
 
         if ($profile === null) {
-            return $unavailable('No student profile is linked to this account yet.');
+            return $state(false, 'No student profile is linked to this account yet.');
         }
 
-        $stage = $profile->latestEnrolment()->with('courseStage')->first()?->courseStage;
+        $alreadyReported = AcademicSessionRegistration::query()
+            ->where('academic_session_id', $session->id)
+            ->where('student_id', $profile->id)
+            ->exists();
+
+        if ($alreadyReported) {
+            return $state(false, 'You have already reported for this session.');
+        }
 
         if (! $stage) {
-            return $unavailable('You are not enrolled on a course stage yet.');
+            return $state(false, 'You are not enrolled on a course stage yet.');
         }
 
         $result = $this->offerings->isStageOpen($session->id, $stage->id);
 
         if (! $result->open) {
-            return $unavailable("{$stage->code} is not open for this session.");
+            return $state(false, $result->reason->message($stage->code));
         }
 
-        return [
-            'can_report' => true,
-            'reason' => null,
-            'module_no' => $stage->module_no,
-            'stage_code' => $stage->code,
-        ];
+        return $state(true, null, $stage->module_no);
     }
 }

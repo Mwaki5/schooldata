@@ -1,6 +1,7 @@
 import { BookOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import PageLoader from '@/components/page-loader'
+import { UnitTypeBadge } from '@/components/unit-type-badge'
 import {
   Card,
   CardContent,
@@ -9,22 +10,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import api from '@/lib/api'
-import { cn } from '@/lib/utils'
-
-function TypeBadge({ core }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-        core
-          ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-          : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {core ? 'Core' : 'Elective'}
-    </span>
-  )
-}
 
 function moduleLabel(moduleNumber) {
   if (moduleNumber === null) {
@@ -115,8 +100,9 @@ export default function MyUnits() {
               <CardTitle>{group.course.name}</CardTitle>
               <CardDescription>
                 {group.curriculum.name} · {group.stats.total}{' '}
-                {group.stats.total === 1 ? 'unit' : 'units'} · {group.stats.core}{' '}
-                core · {group.stats.elective} elective
+                {group.stats.total === 1 ? 'unit' : 'units'} ·{' '}
+                {group.stats.basic} basic · {group.stats.core} core ·{' '}
+                {group.stats.common} common
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -138,14 +124,14 @@ export default function MyUnits() {
                     </div>
 
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full min-w-[560px] text-sm">
                         <thead>
                           <tr className="border-b text-left text-muted-foreground">
-                            <th className="pb-3 font-medium">Code</th>
-                            <th className="pb-3 font-medium">Unit</th>
-                            <th className="pb-3 font-medium">Type</th>
-                            <th className="pb-3 font-medium">Hours</th>
-                            <th className="pb-3 font-medium">Credit</th>
+                            <th className="pb-3 font-medium whitespace-nowrap">Code</th>
+                            <th className="pb-3 font-medium whitespace-nowrap">Unit</th>
+                            <th className="pb-3 font-medium whitespace-nowrap">Type</th>
+                            <th className="pb-3 font-medium whitespace-nowrap">Allocated Hours</th>
+                            <th className="pb-3 font-medium whitespace-nowrap">Credit Factor</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -156,7 +142,7 @@ export default function MyUnits() {
                               </td>
                               <td className="py-3 font-medium">{unit.name}</td>
                               <td className="py-3">
-                                <TypeBadge core={unit.core} />
+                                <UnitTypeBadge type={unit.unit_type} />
                               </td>
                               <td className="py-3 text-muted-foreground">
                                 {unit.taught_hours ?? '—'}

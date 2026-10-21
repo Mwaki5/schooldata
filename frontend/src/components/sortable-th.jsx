@@ -22,7 +22,7 @@ export function SortableTh({ column, label, sort, order, onSort, className }) {
     <th
       scope="col"
       aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className={cn('pb-3 font-medium', className)}
+      className={cn('pb-3 font-medium whitespace-nowrap', className)}
     >
       <button
         type="button"

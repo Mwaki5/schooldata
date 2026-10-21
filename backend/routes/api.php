@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\PasswordUpdateController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CertificationLevels\CertificationLevelController;
 use App\Http\Controllers\Courses\CourseController;
+use App\Http\Controllers\CourseUnits\CourseUnitController;
 use App\Http\Controllers\Curriculums\CurriculumController;
 use App\Http\Controllers\Departments\DepartmentController;
 use App\Http\Controllers\Enrolments\EnrolmentController;
@@ -16,11 +17,13 @@ use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
 use App\Http\Controllers\Me\DashboardController;
 use App\Http\Controllers\Me\MyUnitsController;
 use App\Http\Controllers\Me\ReportSessionController;
+use App\Http\Controllers\Me\SessionUnitsController;
 use App\Http\Controllers\Roles\RoleController;
 use App\Http\Controllers\SessionOfferings\SessionOfferingController;
 use App\Http\Controllers\Staff\StaffController;
 use App\Http\Controllers\Students\StudentController;
 use App\Http\Controllers\TermEvents\TermEventController;
+use App\Http\Controllers\UnitGrades\UnitGradeController;
 use App\Http\Controllers\Units\UnitController;
 use App\Http\Controllers\Users\UserController;
 use App\Http\Resources\UserResource;
@@ -89,6 +92,19 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:student')
         ->middleware('throttle:api')
         ->name('me.report-session');
+
+    // The units offered for the running session once the student has
+    // reported: active units of their enrolled course at the module they
+    // reported for, plus registering the units they tick.
+    Route::get('me/session-units', [SessionUnitsController::class, 'index'])
+        ->middleware('role:student')
+        ->middleware('throttle:api')
+        ->name('me.session-units.index');
+
+    Route::post('me/session-units', [SessionUnitsController::class, 'store'])
+        ->middleware('role:student')
+        ->middleware('throttle:api')
+        ->name('me.session-units.store');
 
     Route::get('roles', [RoleController::class, 'index'])
         ->middleware('role:admin')
@@ -162,6 +178,27 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('exam-body-grades.destroy');
+
+    // Unit grading: award theory / practical marks for a student's
+    // registered units; three of each type fully grade a unit. The
+    // console picks run session → unit → student → paper, so the two
+    // lookups feed it before the payload endpoint.
+    Route::get('unit-grades/units', [UnitGradeController::class, 'units'])
+        ->middleware('role:admin,trainer')
+        ->middleware('throttle:api')
+        ->name('unit-grades.units');
+    Route::get('unit-grades/students', [UnitGradeController::class, 'students'])
+        ->middleware('role:admin,trainer')
+        ->middleware('throttle:api')
+        ->name('unit-grades.students');
+    Route::get('unit-grades', [UnitGradeController::class, 'index'])
+        ->middleware('role:admin,trainer')
+        ->middleware('throttle:api')
+        ->name('unit-grades.index');
+    Route::put('unit-grades', [UnitGradeController::class, 'save'])
+        ->middleware('role:admin,trainer')
+        ->middleware('throttle:api')
+        ->name('unit-grades.save');
 
     Route::get('certification-levels', [CertificationLevelController::class, 'index'])
         ->middleware('role:admin')
@@ -247,10 +284,34 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('units.destroy');
 
-    Route::get('courses/{course}/units', [UnitController::class, 'byCourse'])
+    // The course-unit links: how catalogue units are delivered inside
+    // each course — the wizard's second step and the standalone
+    // Course Units page.
+    Route::get('course-units', [CourseUnitController::class, 'index'])
         ->middleware('role:admin')
         ->middleware('throttle:api')
-        ->name('units.by-course');
+        ->name('course-units.index');
+    Route::post('course-units', [CourseUnitController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.store');
+    Route::get('course-units/{courseUnit}', [CourseUnitController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.show');
+    Route::match(['PUT', 'PATCH'], 'course-units/{courseUnit}', [CourseUnitController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.update');
+    Route::delete('course-units/{courseUnit}', [CourseUnitController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.destroy');
+
+    Route::get('courses/{course}/units', [CourseUnitController::class, 'byCourse'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-units.by-course');
 
     Route::get('academic-years', [AcademicYearController::class, 'index'])
         ->middleware('role:admin')

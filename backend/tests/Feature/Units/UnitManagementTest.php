@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Course;
+use App\Models\CourseUnit;
 use App\Models\Curriculum;
 use App\Models\Unit;
 use App\Models\User;
@@ -13,48 +14,63 @@ function unitsAccessTokenFor(User $user): string
     return JWTAuth::claims(['type' => 'access'])->fromUser($user);
 }
 
+/**
+ * Link a catalogue unit into one course + curriculum pair.
+ */
+function unitsLink(Unit $unit, Course $course, Curriculum $curriculum): CourseUnit
+{
+    return CourseUnit::factory()->create([
+        'unit_id' => $unit->id,
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+    ]);
+}
+
 test('unit endpoints require an access token', function () {
     $this->getJson('/api/units')->assertUnauthorized();
     $this->postJson('/api/units', ['code' => 'U101', 'name' => 'Unit'])
         ->assertUnauthorized();
 });
 
-test('the list returns each offering with its course and curriculum', function () {
-    $course = Course::factory()->create(['name' => 'ICT Technician Level 4']);
-    $curriculum = Curriculum::factory()->create(['name' => 'Cycle 4']);
+test('the list returns catalogue units with their link counts', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
 
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create([
+    $unit = Unit::factory()->create([
         'code' => 'U101',
         'name' => 'Computer Systems',
-        'credit_factor' => 2.5,
+        'description' => 'Hardware, operating systems and troubleshooting.',
     ]);
+    unitsLink($unit, $course, $curriculum);
 
     $this->withToken(unitsAccessTokenFor(User::factory()->create()))
         ->getJson('/api/units')
         ->assertOk()
         ->assertJsonStructure([
             'units' => [[
-                'id', 'course_id', 'curriculum_id', 'code', 'name', 'description',
-                'modules_taught', 'taught_hours', 'credit_factor', 'core',
-                'is_active',
+                'id', 'code', 'name', 'description', 'course_units_count',
+                'created_by', 'updated_by',
             ]],
         ])
         ->assertJsonCount(1, 'units')
         ->assertJsonPath('units.0.code', 'U101')
-        ->assertJsonPath('units.0.course.name', 'ICT Technician Level 4')
-        ->assertJsonPath('units.0.curriculum.name', 'Cycle 4')
-        ->assertJsonPath('units.0.credit_factor', '2.50');
+        ->assertJsonPath('units.0.name', 'Computer Systems')
+        ->assertJsonPath('units.0.course_units_count', 1);
 });
 
-test('the list filters by course and curriculum', function () {
+test('the list filters by the course and curriculum the unit is linked into', function () {
     $course = Course::factory()->create();
     $otherCourse = Course::factory()->create();
     $curriculum = Curriculum::factory()->create();
     $otherCurriculum = Curriculum::factory()->create();
 
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U101']);
-    Unit::factory()->for($course, 'course')->for($otherCurriculum, 'curriculum')->create(['code' => 'U102']);
-    Unit::factory()->for($otherCourse, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U103']);
+    $first = Unit::factory()->create(['code' => 'U101']);
+    $second = Unit::factory()->create(['code' => 'U102']);
+    $third = Unit::factory()->create(['code' => 'U103']);
+
+    unitsLink($first, $course, $curriculum);
+    unitsLink($second, $course, $otherCurriculum);
+    unitsLink($third, $otherCourse, $curriculum);
 
     $token = unitsAccessTokenFor(User::factory()->create());
 
@@ -75,20 +91,9 @@ test('the list filters by course and curriculum', function () {
         ->assertJsonPath('units.0.code', 'U101');
 });
 
-test('the list supports search by code and name, status filter, sorting and pagination', function () {
-    $course = Course::factory()->create();
-    $curriculum = Curriculum::factory()->create();
-
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create([
-        'code' => 'U101',
-        'name' => 'Computer Systems',
-        'is_active' => true,
-    ]);
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create([
-        'code' => 'U900',
-        'name' => 'Retired Arithmetic',
-        'is_active' => false,
-    ]);
+test('the list supports search by code and name, sorting and pagination', function () {
+    Unit::factory()->create(['code' => 'U101', 'name' => 'Computer Systems']);
+    Unit::factory()->create(['code' => 'U900', 'name' => 'Retired Arithmetic']);
 
     $token = unitsAccessTokenFor(User::factory()->create());
 
@@ -109,12 +114,6 @@ test('the list supports search by code and name, status filter, sorting and pagi
         ->assertJsonCount(1, 'units')
         ->assertJsonPath('units.0.code', 'U900');
 
-    $this->withToken($token)
-        ->getJson('/api/units?is_active=0')
-        ->assertOk()
-        ->assertJsonCount(1, 'units')
-        ->assertJsonPath('units.0.code', 'U900');
-
     $sorted = $this->withToken($token)
         ->getJson('/api/units?sort=code&order=desc')
         ->assertOk();
@@ -131,102 +130,77 @@ test('the list supports search by code and name, status filter, sorting and pagi
         ->assertJsonPath('meta.current_page', 2);
 });
 
-test('a course units listing groups its offerings by curriculum names', function () {
+test('a unit shows with every course it is linked into', function () {
     $course = Course::factory()->create(['name' => 'ICT Technician Level 4']);
-    $otherCourse = Course::factory()->create();
     $curriculum = Curriculum::factory()->create(['name' => 'Cycle 4']);
 
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U101', 'name' => 'Computer Systems']);
-    Unit::factory()->for($otherCourse, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U101', 'name' => 'A different unit']);
+    $unit = Unit::factory()->create(['code' => 'U101', 'name' => 'Computer Systems']);
+    unitsLink($unit, $course, $curriculum);
 
     $this->withToken(unitsAccessTokenFor(User::factory()->create()))
-        ->getJson('/api/courses/'.$course->id.'/units')
+        ->getJson('/api/units/'.$unit->id)
         ->assertOk()
-        ->assertJsonCount(1, 'units')
-        ->assertJsonPath('units.0.code', 'U101')
-        ->assertJsonPath('units.0.curriculum.name', 'Cycle 4');
+        ->assertJsonPath('unit.code', 'U101')
+        ->assertJsonPath('unit.course_units_count', 1)
+        ->assertJsonPath('unit.course_units.0.course.name', 'ICT Technician Level 4')
+        ->assertJsonPath('unit.course_units.0.curriculum.name', 'Cycle 4');
 });
 
-test('a unit can be created with its course, curriculum, teaching load and audit stamps', function () {
-    $course = Course::factory()->create();
-    $curriculum = Curriculum::factory()->create();
+test('a unit can be created with its details and audit stamps', function () {
     $creator = User::factory()->create();
 
     $this->withToken(unitsAccessTokenFor($creator))
         ->postJson('/api/units', [
-            'course_id' => $course->id,
-            'curriculum_id' => $curriculum->id,
             'code' => 'U101',
             'name' => 'Computer Systems',
             'description' => 'Hardware, operating systems and troubleshooting.',
-            'modules_taught' => 8,
-            'taught_hours' => 45,
-            'credit_factor' => 2.5,
-            'core' => true,
-            'is_active' => true,
         ])
         ->assertCreated()
         ->assertJsonStructure([
-            'unit' => ['id', 'course_id', 'curriculum_id', 'code', 'name', 'description'],
+            'unit' => ['id', 'code', 'name', 'description', 'course_units_count'],
         ])
-        ->assertJsonPath('unit.course_id', $course->id)
-        ->assertJsonPath('unit.curriculum_id', $curriculum->id)
         ->assertJsonPath('unit.code', 'U101')
         ->assertJsonPath('unit.name', 'Computer Systems')
-        ->assertJsonPath('unit.modules_taught', 8)
-        ->assertJsonPath('unit.taught_hours', 45)
-        ->assertJsonPath('unit.credit_factor', '2.50')
-        ->assertJsonPath('unit.core', true)
+        ->assertJsonPath('unit.course_units_count', 0)
         ->assertJsonPath('unit.created_by', $creator->id)
         ->assertJsonPath('unit.updated_by', $creator->id);
 
     $this->assertDatabaseHas('units', [
-        'course_id' => $course->id,
-        'curriculum_id' => $curriculum->id,
         'code' => 'U101',
         'name' => 'Computer Systems',
         'created_by' => $creator->id,
     ]);
 });
 
-test('a unit code is required and must be unique within its course and curriculum', function () {
-    $course = Course::factory()->create();
-    $curriculum = Curriculum::factory()->create();
-
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U101']);
+test('a unit code is required and unique across the catalogue', function () {
+    Unit::factory()->create(['code' => 'U101']);
 
     $token = unitsAccessTokenFor(User::factory()->create());
-    $payload = ['course_id' => $course->id, 'curriculum_id' => $curriculum->id, 'name' => 'Some unit'];
 
     $this->withToken($token)
-        ->postJson('/api/units', [...$payload, 'code' => ''])
+        ->postJson('/api/units', ['code' => '', 'name' => 'Some unit'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['code']);
 
-    // Same code under the same course + curriculum is taken.
+    // The code identifies the unit catalogue-wide, whatever course
+    // later links it.
     $this->withToken($token)
-        ->postJson('/api/units', [...$payload, 'code' => 'U101'])
+        ->postJson('/api/units', ['code' => 'U101', 'name' => 'Some unit'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['code']);
-
-    // The course and curriculum themselves are required.
-    $this->withToken($token)
-        ->postJson('/api/units', ['code' => 'U102', 'name' => 'Missing pair'])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors(['course_id', 'curriculum_id']);
 });
 
-test('the same code may identify different units in another course or curriculum', function () {
+test('the same code may not identify units in different courses', function () {
     $course = Course::factory()->create();
     $otherCourse = Course::factory()->create();
     $curriculum = Curriculum::factory()->create();
-    $otherCurriculum = Curriculum::factory()->create();
 
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create(['code' => '101']);
+    Unit::factory()->create(['code' => '101']);
 
     $token = unitsAccessTokenFor(User::factory()->create());
 
-    // A different course may reuse the code for a different unit.
+    // One catalogue entry per code: another course links the existing
+    // unit instead of creating its own.
     $this->withToken($token)
         ->postJson('/api/units', [
             'course_id' => $otherCourse->id,
@@ -234,25 +208,18 @@ test('the same code may identify different units in another course or curriculum
             'code' => '101',
             'name' => 'A different 101',
         ])
-        ->assertCreated();
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['code']);
 
-    // A different curriculum of the same course may too.
-    $this->withToken($token)
-        ->postJson('/api/units', [
-            'course_id' => $course->id,
-            'curriculum_id' => $otherCurriculum->id,
-            'code' => '101',
-            'name' => '101 under the new curriculum',
-        ])
-        ->assertCreated();
-
-    $this->assertDatabaseCount('units', 3);
+    $this->assertDatabaseCount('units', 1);
 });
 
-test('a soft-deleted unit frees its code for reuse within the pair', function () {
+test('a soft-deleted unit frees its code for reuse and removes its links', function () {
     $course = Course::factory()->create();
     $curriculum = Curriculum::factory()->create();
-    $unit = Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U101']);
+
+    $unit = Unit::factory()->create(['code' => 'U101']);
+    unitsLink($unit, $course, $curriculum);
 
     $token = unitsAccessTokenFor(User::factory()->create());
 
@@ -262,27 +229,23 @@ test('a soft-deleted unit frees its code for reuse within the pair', function ()
 
     $this->assertSoftDeleted('units', ['id' => $unit->id]);
 
+    // The deliveries went with the unit: nothing dangles behind it.
+    expect(CourseUnit::query()->where('unit_id', $unit->id)->count())->toBe(0);
+
     $this->withToken($token)
         ->postJson('/api/units', [
-            'course_id' => $course->id,
-            'curriculum_id' => $curriculum->id,
             'code' => 'U101',
             'name' => 'Re-entered unit',
         ])
         ->assertCreated();
 });
 
-test('a unit cannot be updated onto another unit\'s code within the pair', function () {
-    $course = Course::factory()->create();
-    $curriculum = Curriculum::factory()->create();
-
-    Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U101', 'name' => 'Computer Systems']);
-    $unit = Unit::factory()->for($course, 'course')->for($curriculum, 'curriculum')->create(['code' => 'U102', 'name' => 'Networking Basics']);
+test('a unit cannot be updated onto another unit\'s code', function () {
+    Unit::factory()->create(['code' => 'U101', 'name' => 'Computer Systems']);
+    $unit = Unit::factory()->create(['code' => 'U102', 'name' => 'Networking Basics']);
 
     $this->withToken(unitsAccessTokenFor(User::factory()->create()))
         ->putJson('/api/units/'.$unit->id, [
-            'course_id' => $course->id,
-            'curriculum_id' => $curriculum->id,
             'code' => 'U101',
             'name' => 'Networking Basics',
         ])
@@ -290,31 +253,20 @@ test('a unit cannot be updated onto another unit\'s code within the pair', funct
         ->assertJsonValidationErrors(['code']);
 });
 
-test('a unit teaching load can be updated', function () {
-    $unit = Unit::factory()->create(['code' => 'U101', 'name' => 'Computer Systems', 'credit_factor' => 1]);
+test('a unit\'s own details can be updated', function () {
+    $unit = Unit::factory()->create(['code' => 'U101', 'name' => 'Computer Systems']);
     $updater = User::factory()->create();
 
     $this->withToken(unitsAccessTokenFor($updater))
         ->putJson('/api/units/'.$unit->id, [
-            'course_id' => $unit->course_id,
-            'curriculum_id' => $unit->curriculum_id,
             'code' => 'U101',
             'name' => 'Computer Systems & Peripherals',
             'description' => null,
-            'modules_taught' => 10,
-            'taught_hours' => 60,
-            'credit_factor' => 3.5,
-            'core' => false,
-            'is_active' => false,
         ])
         ->assertOk()
         ->assertJsonPath('unit.name', 'Computer Systems & Peripherals')
-        ->assertJsonPath('unit.modules_taught', 10)
-        ->assertJsonPath('unit.taught_hours', 60)
-        ->assertJsonPath('unit.credit_factor', '3.50')
-        ->assertJsonPath('unit.core', false)
-        ->assertJsonPath('unit.is_active', false)
+        ->assertJsonPath('unit.description', null)
         ->assertJsonPath('unit.updated_by', $updater->id);
 
-    $this->assertDatabaseHas('units', ['id' => $unit->id, 'credit_factor' => 3.5]);
+    $this->assertDatabaseHas('units', ['id' => $unit->id, 'name' => 'Computer Systems & Peripherals']);
 });

@@ -6,6 +6,7 @@ use App\Models\AcademicYear;
 use App\Models\CertificationLevel;
 use App\Models\Course;
 use App\Models\CourseEnrolment;
+use App\Models\CourseUnit;
 use App\Models\Curriculum;
 use App\Models\StudentProfile;
 use App\Models\Unit;
@@ -61,7 +62,13 @@ test('the dashboard returns the student profile, academic calendar and own enrol
     $otherCourse = Course::factory()->create(['code' => 'CIT', 'name' => 'Certificate in ICT']);
     $curriculum = Curriculum::factory()->create(['name' => 'TVET Diploma Curriculum']);
     $level = CertificationLevel::factory()->create(['name' => 'Diploma']);
-    Unit::factory()->count(2)->create(['course_id' => $course->id]);
+    Unit::factory()->count(2)->create()->each(
+        fn (Unit $unit) => CourseUnit::factory()->create([
+            'unit_id' => $unit->id,
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+        ]),
+    );
 
     $user = User::factory()->create(['role' => Role::Student, 'login_id' => 'ADM-2026-0001']);
     $student = StudentProfile::factory()->create([

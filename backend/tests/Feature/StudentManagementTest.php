@@ -37,6 +37,7 @@ function openStudentRegistrationStage(Course $course, AcademicSession $session):
         'name' => TermEventName::SessionRegistration,
         'start_date' => now()->subDay()->toDateString(),
         'end_date' => now()->addWeek()->toDateString(),
+        'is_active' => true,
     ]);
 
     SessionStageOffering::factory()

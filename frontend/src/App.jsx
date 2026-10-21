@@ -29,6 +29,8 @@ const CourseUnits = lazy(() => import('@/pages/units/CourseUnits'))
 const Units = lazy(() => import('@/pages/units/Units'))
 const UnitForm = lazy(() => import('@/pages/units/UnitForm'))
 const UnitDetails = lazy(() => import('@/pages/units/UnitDetails'))
+const CourseUnitList = lazy(() => import('@/pages/course-units/CourseUnits'))
+const CourseUnitForm = lazy(() => import('@/pages/course-units/CourseUnitForm'))
 const AcademicYears = lazy(() => import('@/pages/academic-years/AcademicYears'))
 const AcademicYearForm = lazy(() => import('@/pages/academic-years/AcademicYearForm'))
 const AcademicSessions = lazy(() => import('@/pages/academic-sessions/AcademicSessions'))
@@ -44,6 +46,7 @@ const Activities = lazy(() => import('@/pages/activities/Activities'))
 const Profile = lazy(() => import('@/pages/profile/Profile'))
 const MyUnits = lazy(() => import('@/pages/my-units/MyUnits'))
 const OpenSession = lazy(() => import('@/pages/session-offerings/OpenSession'))
+const UnitGrades = lazy(() => import('@/pages/unit-grades/UnitGrades'))
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -193,6 +196,12 @@ export default function App() {
             <Route path="/units/create" element={<UnitForm />} />
             <Route path="/units/:unitId" element={<UnitDetails />} />
             <Route path="/units/:unitId/edit" element={<UnitForm />} />
+            <Route path="/course-units" element={<CourseUnitList />} />
+            <Route path="/course-units/create" element={<CourseUnitForm />} />
+            <Route
+              path="/course-units/:courseUnitId/edit"
+              element={<CourseUnitForm />}
+            />
             <Route path="/academic-years" element={<AcademicYears />} />
             <Route path="/academic-years/create" element={<AcademicYearForm />} />
             <Route
@@ -226,6 +235,17 @@ export default function App() {
             />
             <Route path="/enrolments" element={<Enrolments />} />
             <Route path="/activities" element={<Activities />} />
+          </Route>
+          {/* Admin + trainer section: the backend applies the same
+              `role:admin,trainer` middleware to these routes. */}
+          <Route
+            element={
+              <RoleRoute roles={['admin', 'trainer']}>
+                <Outlet />
+              </RoleRoute>
+            }
+          >
+            <Route path="/unit-grades" element={<UnitGrades />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

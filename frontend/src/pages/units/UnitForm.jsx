@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -8,8 +8,16 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select } from '@/components/ui/select'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import api, { loadErrorMessage, validationErrors } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 /** Course options everywhere show "CODE — Name", matching StudentForm. */
 function courseLabel(course) {
@@ -20,24 +28,58 @@ function courseLabel(course) {
   return course.code ? `${course.code} — ${course.name}` : course.name
 }
 
+/** The numbered step circles from the Open Session wizard. */
+function StepMarker({ number, label, active, done }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={cn(
+          'flex size-7 items-center justify-center rounded-full border text-xs font-semibold',
+          active && 'border-primary bg-primary text-primary-foreground',
+          done && 'border-emerald-500 bg-emerald-500 text-white',
+          !active && !done && 'border-input text-muted-foreground',
+        )}
+      >
+        {done ? <Check aria-hidden="true" className="size-3.5" /> : number}
+      </span>
+      <span
+        className={cn(
+          'text-sm font-medium',
+          active || done ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        {label}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * The unit wizard, in two steps like the Open Session flow: step one
+ * creates (or edits) the catalogue unit itself — code, name,
+ * description — and step two assigns it to a course + curriculum with
+ * its teaching load, credit factor and role.
+ */
 export default function UnitForm() {
   const { unitId } = useParams()
   const isEdit = Boolean(unitId)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
+  const [step, setStep] = useState(1)
   const [unit, setUnit] = useState(null)
+  // The unit's existing course link, when the wizard edits one.
+  const [courseUnit, setCourseUnit] = useState(null)
   const [course, setCourse] = useState(null) // { id, name }
   const [curriculum, setCurriculum] = useState(null) // { id, name }
   const [loading, setLoading] = useState(isEdit)
   const [loadError, setLoadError] = useState(null)
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
-  const [formKey, setFormKey] = useState(0) // remount to clear fields after create
 
-  // Load the form state on mount: the unit itself on edit, and the
-  // course / curriculum preselected from a course's own page
-  // (/units/create?course=…&curriculum=…) on create.
+  // Load the form state on mount: the unit with its course links on
+  // edit, and the course / curriculum preselected from a course's own
+  // page (/units/create?course=…&curriculum=…) on create.
   useEffect(() => {
     let active = true
 
@@ -48,19 +90,22 @@ export default function UnitForm() {
           if (active) {
             const loaded = data.unit
             setUnit(loaded)
-            setCourse(
-              loaded.course_id
-                ? {
-                    id: loaded.course_id,
-                    name: courseLabel(loaded.course),
-                  }
-                : null,
-            )
-            setCurriculum(
-              loaded.curriculum_id
-                ? { id: loaded.curriculum_id, name: loaded.curriculum?.name ?? '' }
-                : null,
-            )
+
+            const link = loaded.course_units?.[0] ?? null
+            setCourseUnit(link)
+
+            if (link) {
+              setCourse(
+                link.course
+                  ? { id: link.course.id, name: courseLabel(link.course) }
+                  : null,
+              )
+              setCurriculum(
+                link.curriculum
+                  ? { id: link.curriculum.id, name: link.curriculum.name }
+                  : null,
+              )
+            }
           }
         })
         .catch((error) => {
@@ -130,7 +175,49 @@ export default function UnitForm() {
     }
   }, [isEdit, unitId, searchParams])
 
-  const handleSubmit = async (event) => {
+  /** Step one: save the unit's own details, then move on. */
+  const handleUnitSubmit = async (event) => {
+    event.preventDefault()
+
+    setErrors({})
+    setSubmitting(true)
+
+    const formData = new FormData(event.currentTarget)
+    const payload = {
+      code: String(formData.get('code') ?? '').trim(),
+      name: String(formData.get('name') ?? '').trim(),
+      description: String(formData.get('description') ?? '').trim() || null,
+    }
+
+    try {
+      if (isEdit) {
+        const { data } = await api.put(`/units/${unitId}`, payload)
+        setUnit(data.unit)
+        toast.success('Unit details saved')
+      } else {
+        const { data } = await api.post('/units', payload)
+        setUnit(data.unit)
+      }
+
+      setErrors({})
+      setStep(2)
+    } catch (error) {
+      const fieldErrors = validationErrors(error)
+
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors(fieldErrors)
+      } else {
+        toast.error(
+          error.response?.data?.message ?? 'Unable to save the unit.',
+        )
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** Step two: save the course-unit assignment, then open the unit. */
+  const handleCourseUnitSubmit = async (event) => {
     event.preventDefault()
 
     setErrors({})
@@ -141,29 +228,32 @@ export default function UnitForm() {
       value === '' || value == null ? null : Number(value)
 
     const payload = {
-      course_id: course?.id ?? null,
-      curriculum_id: curriculum?.id ?? null,
-      code: String(formData.get('code') ?? '').trim(),
-      name: String(formData.get('name') ?? '').trim(),
-      description: String(formData.get('description') ?? '').trim() || null,
+      // The identity is fixed once the link exists; a fresh link still
+      // picks its unit, course and curriculum here.
+      ...(courseUnit
+        ? {}
+        : {
+            unit_id: unit?.id ?? null,
+            course_id: course?.id ?? null,
+            curriculum_id: curriculum?.id ?? null,
+          }),
       modules_taught: numberOrNull(formData.get('modules_taught')),
       taught_hours: numberOrNull(formData.get('taught_hours')),
       credit_factor: numberOrNull(formData.get('credit_factor')),
-      core: formData.get('core') === '1',
+      unit_type: String(formData.get('unit_type') ?? 'core'),
       is_active: formData.get('is_active') === '1',
     }
 
     try {
-      if (isEdit) {
-        await api.put(`/units/${unitId}`, payload)
-        toast.success('Unit updated')
-        navigate(`/units/${unitId}`)
+      if (courseUnit) {
+        await api.put(`/course-units/${courseUnit.id}`, payload)
+        toast.success(`Course unit for "${unit.name}" updated`)
       } else {
-        await api.post('/units', payload)
-
-        toast.success(`"${payload.name}" added to the course`)
-        setFormKey((k) => k + 1) // remount → scalars clear, pickers stay selected
+        await api.post('/course-units', payload)
+        toast.success(`"${unit.name}" assigned to the course`)
       }
+
+      navigate(`/units/${unit.id}`)
     } catch (error) {
       const fieldErrors = validationErrors(error)
 
@@ -171,7 +261,7 @@ export default function UnitForm() {
         setErrors(fieldErrors)
       } else {
         toast.error(
-          error.response?.data?.message ?? 'Unable to save the unit.',
+          error.response?.data?.message ?? 'Unable to save the course unit.',
         )
       }
     } finally {
@@ -205,212 +295,326 @@ export default function UnitForm() {
         <ArrowLeft aria-hidden="true" /> Back to units
       </Link>
 
-      <Card className="py-8">
-        <CardHeader>
-          <CardTitle>{isEdit ? 'Edit Unit' : 'Add Unit to Course'}</CardTitle>
-          <CardDescription>
-            {isEdit
-              ? 'Update the unit below. Its code must stay unique within its course and curriculum.'
-              : 'Offer a unit under one course and curriculum. The same code may be reused by other courses.'}
-          </CardDescription>
-        </CardHeader>
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border bg-card px-5 py-4">
+        <StepMarker
+          number={1}
+          label="Unit"
+          active={step === 1}
+          done={step > 1}
+        />
+        <span className="text-muted-foreground">/</span>
+        <StepMarker
+          number={2}
+          label="Course Unit"
+          active={step === 2}
+          done={false}
+        />
+      </div>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate key={formKey}>
-            {/* Small screens: one input per row; md and up: two per row;
-                lg and up: three per row. */}
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              <FormField
-                id="course_id"
-                label="Course"
-                required
-                error={errors.course_id}
-              >
-                <SearchableSelect
-                  id="course_select"
-                  value={course?.id ?? null}
-                  selectedLabel={course?.name ?? '-- Choose a course --'}
-                  onChange={(nextId, option) =>
-                    setCourse(nextId ? { id: nextId, name: option?.name ?? '' } : null)
-                  }
-                  fetchOptions={(query, signal) =>
-                    api
-                      .get('/courses', {
-                        params: {
-                          per_page: 100,
-                          ...(query ? { search: query } : {}),
-                        },
-                        signal,
-                      })
-                      .then(({ data }) =>
-                        data.courses.map((c) => ({
-                          id: c.id,
-                          name: courseLabel(c),
-                        })),
-                      )
-                  }
-                  placeholder="-- Choose a course --"
-                  searchPlaceholder="Type a course code or name…"
+      {step === 1 && (
+        <Card className="py-8">
+          <CardHeader>
+            <CardTitle>
+              {isEdit ? '1. Unit details' : '1. Create the unit'}
+            </CardTitle>
+            <CardDescription>
+              {isEdit
+                ? 'The unit’s own identity in the catalogue. Its deliveries under courses live on the next step.'
+                : 'The unit’s own identity in the catalogue: one code, one name. On the next step you assign it to a course.'}
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <form
+              onSubmit={handleUnitSubmit}
+              className="space-y-5"
+              noValidate
+            >
+              <div className="grid gap-5 md:grid-cols-2">
+                <FormField
+                  id="code"
+                  label="Code"
+                  name="code"
+                  required
+                  defaultValue={unit?.code ?? ''}
+                  placeholder="e.g. BCS101"
+                  autoComplete="off"
+                  maxLength={50}
+                  error={errors.code}
                 />
-              </FormField>
 
-              <FormField
-                id="curriculum_id"
-                label="Curriculum"
-                required
-                error={errors.curriculum_id}
-              >
-                <SearchableSelect
-                  id="curriculum_select"
-                  value={curriculum?.id ?? null}
-                  selectedLabel={
-                    curriculum?.name ?? '-- Choose a curriculum --'
-                  }
-                  onChange={(nextId, option) =>
-                    setCurriculum(
-                      nextId ? { id: nextId, name: option?.name ?? '' } : null,
-                    )
-                  }
-                  fetchOptions={(query, signal) =>
-                    api
-                      .get('/curricula', {
-                        params: {
-                          per_page: 100,
-                          ...(query ? { search: query } : {}),
-                        },
-                        signal,
-                      })
-                      .then(({ data }) =>
-                        data.curricula.map((c) => ({
-                          id: c.id,
-                          name: c.name,
-                        })),
-                      )
-                  }
-                  placeholder="-- Choose a curriculum --"
-                  searchPlaceholder="Type to find a curriculum…"
+                <FormField
+                  id="name"
+                  label="Name"
+                  name="name"
+                  required
+                  defaultValue={unit?.name ?? ''}
+                  placeholder="e.g. Basic Computer Skills"
+                  autoComplete="off"
+                  maxLength={255}
+                  error={errors.name}
                 />
-              </FormField>
-
-              <FormField
-                id="code"
-                label="Code"
-                name="code"
-                required
-                defaultValue={unit?.code ?? ''}
-                placeholder="e.g. BCS101"
-                autoComplete="off"
-                maxLength={50}
-                error={errors.code}
-              />
-
-              <FormField
-                id="name"
-                label="Name"
-                name="name"
-                required
-                defaultValue={unit?.name ?? ''}
-                placeholder="e.g. Basic Computer Skills"
-                autoComplete="off"
-                maxLength={255}
-                error={errors.name}
-              />
-
-              <FormField
-                id="modules_taught"
-                label="Module"
-                name="modules_taught"
-                type="number"
-                min={0}
-                max={32767}
-                defaultValue={unit?.modules_taught ?? ''}
-                placeholder="e.g. 2"
-                error={errors.modules_taught}
-              />
-
-              <FormField
-                id="taught_hours"
-                label="Training Hours"
-                name="taught_hours"
-                type="number"
-                min={0}
-                max={32767}
-                defaultValue={unit?.taught_hours ?? ''}
-                placeholder="e.g. 45"
-                error={errors.taught_hours}
-              />
-
-              <FormField
-                id="credit_factor"
-                label="Credit Factor"
-                name="credit_factor"
-                type="number"
-                min={0}
-                step="0.01"
-                defaultValue={unit?.credit_factor ?? ''}
-                placeholder="e.g. 2.5"
-                error={errors.credit_factor}
-              />
-
-              <div className="space-y-2">
-                <Label htmlFor="core">Core Unit</Label>
-                <label
-                  htmlFor="core"
-                  className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
-                >
-                  <Checkbox
-                    id="core"
-                    name="core"
-                    value="1"
-                    defaultChecked={unit?.core ?? true}
-                  />
-                  Required for the qualification
-                </label>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="is_active">Is Active</Label>
-                <label
-                  htmlFor="is_active"
-                  className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+              <FormField
+                id="description"
+                label="Description"
+                name="description"
+                multiline
+                rows={3}
+                defaultValue={unit?.description ?? ''}
+                placeholder="What the unit covers (optional)"
+                error={errors.description}
+              />
+
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? 'Saving…' : 'Continue'}
+                  {!submitting && <ArrowRight aria-hidden="true" />}
+                </Button>
+                <Link
+                  to="/units"
+                  className={buttonVariants({ variant: 'outline' })}
                 >
-                  <Checkbox
-                    id="is_active"
-                    name="is_active"
-                    value="1"
-                    defaultChecked={unit?.is_active ?? true}
-                  />
-                  Unit is currently offered
-                </label>
+                  Cancel
+                </Link>
               </div>
-            </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
-            <FormField
-              id="description"
-              label="Description"
-              name="description"
-              multiline
-              rows={3}
-              defaultValue={unit?.description ?? ''}
-              placeholder="What the unit covers (optional)"
-              error={errors.description}
-            />
+      {step === 2 && unit && (
+        <Card className="py-8">
+          <CardHeader>
+            <CardTitle>2. Course unit</CardTitle>
+            <CardDescription>
+              {courseUnit
+                ? 'Where this unit is taught: adjust its teaching load, credit factor and role inside the course.'
+                : `Assign "${unit.name}" to a course and curriculum with its teaching load, credit factor and role.`}
+            </CardDescription>
+            {(unit.course_units_count ?? 0) > 1 && (
+              <p className="text-xs text-muted-foreground">
+                This unit is linked to {unit.course_units_count} courses.
+                Here you edit the selected one; manage every link under
+                Course Units.
+              </p>
+            )}
+          </CardHeader>
 
-            <div className="flex items-center gap-3">
-              <Button type="submit" disabled={submitting}>
-                {submitting
-                  ? 'Saving…'
-                  : isEdit
-                    ? 'Save Changes'
-                    : 'Add Unit'}
-              </Button>
-              <Link to="/units" className={buttonVariants({ variant: 'outline' })}>
-                Cancel
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          <CardContent>
+            <form
+              onSubmit={handleCourseUnitSubmit}
+              className="space-y-5"
+              noValidate
+            >
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {courseUnit ? (
+                  <>
+                    <div className="space-y-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">
+                        Course
+                      </span>
+                      <p className="truncate rounded-xl border bg-muted/40 px-3 py-2 text-sm">
+                        {course?.name ?? '—'}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">
+                        Curriculum
+                      </span>
+                      <p className="truncate rounded-xl border bg-muted/40 px-3 py-2 text-sm">
+                        {curriculum?.name ?? '—'}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <FormField
+                      id="course_id"
+                      label="Course"
+                      required
+                      error={errors.course_id}
+                    >
+                      <SearchableSelect
+                        id="course_select"
+                        value={course?.id ?? null}
+                        selectedLabel={course?.name ?? '-- Choose a course --'}
+                        onChange={(nextId, option) =>
+                          setCourse(
+                            nextId
+                              ? { id: nextId, name: option?.name ?? '' }
+                              : null,
+                          )
+                        }
+                        fetchOptions={(query, signal) =>
+                          api
+                            .get('/courses', {
+                              params: {
+                                per_page: 100,
+                                ...(query ? { search: query } : {}),
+                              },
+                              signal,
+                            })
+                            .then(({ data }) =>
+                              data.courses.map((c) => ({
+                                id: c.id,
+                                name: courseLabel(c),
+                              })),
+                            )
+                        }
+                        placeholder="-- Choose a course --"
+                        searchPlaceholder="Type a course code or name…"
+                      />
+                    </FormField>
+
+                    <FormField
+                      id="curriculum_id"
+                      label="Curriculum"
+                      required
+                      error={errors.curriculum_id}
+                    >
+                      <SearchableSelect
+                        id="curriculum_select"
+                        value={curriculum?.id ?? null}
+                        selectedLabel={
+                          curriculum?.name ?? '-- Choose a curriculum --'
+                        }
+                        onChange={(nextId, option) =>
+                          setCurriculum(
+                            nextId
+                              ? { id: nextId, name: option?.name ?? '' }
+                              : null,
+                          )
+                        }
+                        fetchOptions={(query, signal) =>
+                          api
+                            .get('/curricula', {
+                              params: {
+                                per_page: 100,
+                                ...(query ? { search: query } : {}),
+                              },
+                              signal,
+                            })
+                            .then(({ data }) =>
+                              data.curricula.map((c) => ({
+                                id: c.id,
+                                name: c.name,
+                              })),
+                            )
+                        }
+                        placeholder="-- Choose a curriculum --"
+                        searchPlaceholder="Type to find a curriculum…"
+                      />
+                    </FormField>
+                  </>
+                )}
+
+                <FormField
+                  id="modules_taught"
+                  label="Module"
+                  name="modules_taught"
+                  type="number"
+                  min={0}
+                  max={32767}
+                  defaultValue={courseUnit?.modules_taught ?? ''}
+                  placeholder="e.g. 2"
+                  error={errors.modules_taught}
+                />
+
+                <FormField
+                  id="taught_hours"
+                  label="Allocated Hours"
+                  name="taught_hours"
+                  type="number"
+                  min={0}
+                  max={32767}
+                  defaultValue={courseUnit?.taught_hours ?? ''}
+                  placeholder="e.g. 45"
+                  error={errors.taught_hours}
+                />
+
+                <FormField
+                  id="credit_factor"
+                  label="Credit Factor"
+                  name="credit_factor"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  defaultValue={courseUnit?.credit_factor ?? ''}
+                  placeholder="e.g. 2.5"
+                  error={errors.credit_factor}
+                />
+
+                <FormField
+                  id="unit_type"
+                  label="Unit Type"
+                  required
+                  error={errors.unit_type}
+                >
+                  <Select
+                    id="unit_type"
+                    name="unit_type"
+                    defaultValue={courseUnit?.unit_type ?? 'core'}
+                  >
+                    <option value="basic">Basic Unit</option>
+                    <option value="core">Core Unit</option>
+                    <option value="common">Common Unit</option>
+                  </Select>
+                </FormField>
+
+                <div className="space-y-2">
+                  <Label htmlFor="is_active">Is Active</Label>
+                  <label
+                    htmlFor="is_active"
+                    className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+                  >
+                    <Checkbox
+                      id="is_active"
+                      name="is_active"
+                      value="1"
+                      defaultChecked={
+                        courseUnit ? courseUnit.is_active : true
+                      }
+                    />
+                    Unit is currently offered in this course
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                >
+                  {submitting
+                    ? 'Saving…'
+                    : courseUnit
+                      ? 'Save Changes'
+                      : 'Assign Unit'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={submitting}
+                  onClick={() => {
+                    setErrors({})
+                    setStep(1)
+                  }}
+                >
+                  <ArrowLeft aria-hidden="true" /> Back
+                </Button>
+                <Link
+                  to="/units"
+                  className={buttonVariants({ variant: 'ghost' })}
+                >
+                  Cancel
+                </Link>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

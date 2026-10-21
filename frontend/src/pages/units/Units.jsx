@@ -1,4 +1,4 @@
-import { Eye, Pencil, Plus, Power, Trash2 } from 'lucide-react'
+import { BookOpen, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -10,27 +10,9 @@ import { ListSearch } from '@/components/list-search'
 import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
-import { cn } from '@/lib/utils'
-
-function StatusBadge({ active }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-        active
-          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-          : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {active ? 'Active' : 'Inactive'}
-    </span>
-  )
-}
 
 export default function Units() {
   const [deletingId, setDeletingId] = useState(null)
-  const [togglingId, setTogglingId] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('')
   const [courseFilter, setCourseFilter] = useState('')
   const [curriculumFilter, setCurriculumFilter] = useState('')
   const [courseOptions, setCourseOptions] = useState([])
@@ -38,7 +20,8 @@ export default function Units() {
 
   // The course and curriculum filter dropdowns list their options once on
   // mount; failures are swallowed because the table itself loads
-  // independently.
+  // independently. They narrow to units linked into that course or
+  // curriculum.
   useEffect(() => {
     let active = true
 
@@ -65,7 +48,8 @@ export default function Units() {
     }
   }, [])
 
-  // Unit offerings: one row per course + curriculum + code.
+  // The unit catalogue: one row per unit. Teaching loads per course
+  // live on the course-unit links (Course Units).
   const {
     items: units,
     meta,
@@ -85,46 +69,15 @@ export default function Units() {
     notFoundMessage:
       'The units list was not found on the server. The API may be out of date.',
     filters: {
-      is_active: statusFilter || undefined,
       course_id: courseFilter || undefined,
       curriculum_id: curriculumFilter || undefined,
     },
   })
 
-  const handleToggleActive = async (unit) => {
-    setTogglingId(unit.id)
-
-    try {
-      await api.put(`/units/${unit.id}`, {
-        course_id: unit.course_id,
-        curriculum_id: unit.curriculum_id,
-        code: unit.code,
-        name: unit.name,
-        description: unit.description,
-        modules_taught: unit.modules_taught,
-        taught_hours: unit.taught_hours,
-        credit_factor: unit.credit_factor,
-        core: unit.core,
-        is_active: !unit.is_active,
-      })
-
-      toast.success(
-        `Unit "${unit.name}" ${unit.is_active ? 'deactivated' : 'activated'}`,
-      )
-      refresh()
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ?? 'Unable to update the unit. Please try again.',
-      )
-    } finally {
-      setTogglingId(null)
-    }
-  }
-
   const handleDelete = async (unit) => {
     if (
       !window.confirm(
-        `Delete the unit "${unit.name}" (${unit.code})? Its code becomes available again inside this course and curriculum.`,
+        `Delete the unit "${unit.name}" (${unit.code})? Its course links are removed and its code becomes available again.`,
       )
     ) {
       return
@@ -150,15 +103,10 @@ export default function Units() {
   const clearFilters = () => {
     setCourseFilter('')
     setCurriculumFilter('')
-    setStatusFilter('')
     setSearch('')
   }
 
-  const hasFilters =
-    courseFilter !== '' ||
-    curriculumFilter !== '' ||
-    statusFilter !== '' ||
-    search !== ''
+  const hasFilters = courseFilter !== '' || curriculumFilter !== '' || search !== ''
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -166,14 +114,23 @@ export default function Units() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Units</h1>
           <p className="text-sm text-muted-foreground">
-            Every unit offering, one record per course and curriculum. The same
-            code may identify different units in different courses.
+            The unit catalogue: one record per unit. Assign units to a course
+            and curriculum under Course Units.
           </p>
         </div>
-        <Link to="/units/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Unit
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/course-units/create"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            <BookOpen aria-hidden="true" />
+            Link to Course
+          </Link>
+          <Link to="/units/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Unit
+          </Link>
+        </div>
       </div>
 
       {loadError && (
@@ -224,17 +181,6 @@ export default function Units() {
                 ))}
               </Select>
             </div>
-            <div className="w-48">
-              <Select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                aria-label="Filter by status"
-              >
-                <option value="">All statuses</option>
-                <option value="1">Active</option>
-                <option value="0">Inactive</option>
-              </Select>
-            </div>
             {hasFilters && (
               <Button
                 type="button"
@@ -258,7 +204,7 @@ export default function Units() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
                       <SortableTh
@@ -275,20 +221,9 @@ export default function Units() {
                         order={order}
                         onSort={toggleSort}
                       />
-                      <th className="pb-3 font-medium">Course</th>
-                      <th className="pb-3 font-medium">Curriculum</th>
-                      <th className="pb-3 font-medium">Core</th>
-                      <th className="pb-3 font-medium">Module</th>
-                      <th className="pb-3 font-medium">Hours</th>
-                      <th className="pb-3 font-medium">Credit</th>
-                      <SortableTh
-                        column="is_active"
-                        label="Status"
-                        sort={sort}
-                        order={order}
-                        onSort={toggleSort}
-                      />
-                      <th className="pb-3 text-right font-medium">Actions</th>
+                      <th className="pb-3 font-medium whitespace-nowrap">Description</th>
+                      <th className="pb-3 font-medium whitespace-nowrap">Courses</th>
+                      <th className="pb-3 text-right font-medium whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -310,35 +245,11 @@ export default function Units() {
                             {unit.name}
                           </Link>
                         </td>
-                        <td className="max-w-48 truncate py-3 text-muted-foreground">
-                          {unit.course?.name ?? '—'}
-                        </td>
-                        <td className="max-w-40 truncate py-3 text-muted-foreground">
-                          {unit.curriculum?.name ?? '—'}
-                        </td>
-                        <td className="py-3">
-                          <span
-                            className={cn(
-                              'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                              unit.core
-                                ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                                : 'bg-muted text-muted-foreground',
-                            )}
-                          >
-                            {unit.core ? 'Core' : 'Elective'}
-                          </span>
+                        <td className="max-w-72 truncate py-3 text-muted-foreground">
+                          {unit.description || '—'}
                         </td>
                         <td className="py-3 text-muted-foreground">
-                          {unit.modules_taught ?? '—'}
-                        </td>
-                        <td className="py-3 text-muted-foreground">
-                          {unit.taught_hours ?? '—'}
-                        </td>
-                        <td className="py-3 text-muted-foreground">
-                          {unit.credit_factor ?? '—'}
-                        </td>
-                        <td className="py-3">
-                          <StatusBadge active={unit.is_active} />
+                          {unit.course_units_count ?? 0}
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1">
@@ -364,18 +275,17 @@ export default function Units() {
                             >
                               <Pencil aria-hidden="true" />
                             </Link>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={togglingId === unit.id}
-                              title={
-                                unit.is_active ? 'Deactivate unit' : 'Activate unit'
-                              }
-                              aria-label={`${unit.is_active ? 'Deactivate' : 'Activate'} unit ${unit.name}`}
-                              onClick={() => handleToggleActive(unit)}
+                            <Link
+                              to={`/course-units?unit_id=${unit.id}`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                              title="Course links"
+                              aria-label={`Course links for ${unit.name}`}
                             >
-                              <Power aria-hidden="true" />
-                            </Button>
+                              <BookOpen aria-hidden="true" />
+                            </Link>
                             <Button
                               variant="ghost"
                               size="sm"

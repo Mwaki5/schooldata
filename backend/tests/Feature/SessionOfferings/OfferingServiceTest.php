@@ -120,6 +120,31 @@ test('an open stage is blocked when the session has no registration event', func
     expect($result->reason)->toBe(StageOpenReason::NoRegistrationWindow);
 });
 
+test('an open stage is blocked when the registration event is inactive', function () {
+    $session = AcademicSession::factory()->create();
+    $stage = offeringStageFor(Course::factory()->create(), 1, 'Y1S1');
+
+    SessionStageOffering::factory()
+        ->for($session, 'academicSession')
+        ->for($stage, 'courseStage')
+        ->create();
+
+    TermEvent::factory()->create([
+        'academic_session_id' => $session->id,
+        'name' => TermEventName::SessionRegistration,
+        'start_date' => '2026-01-10',
+        'end_date' => '2026-01-20',
+        'is_active' => false,
+    ]);
+
+    travelTo('2026-01-15 12:00:00');
+
+    $result = app(OfferingService::class)->isStageOpen($session->id, $stage->id);
+
+    expect($result->open)->toBeFalse();
+    expect($result->reason)->toBe(StageOpenReason::NoRegistrationWindow);
+});
+
 test('the registration event date boundaries are inclusive whole days', function (string $at, bool $open, StageOpenReason $reason) {
     $session = AcademicSession::factory()->create();
     $stage = offeringStageFor(Course::factory()->create(), 1, 'Y1S1');

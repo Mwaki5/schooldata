@@ -3,12 +3,9 @@
 namespace App\Http\Controllers\Me;
 
 use App\Enums\Role;
-use App\Enums\StageOpenReason;
-use App\Enums\TermEventName;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\AcademicSessionRegistration;
-use App\Models\TermEvent;
 use App\Services\Offerings\OfferingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,10 +19,11 @@ class ReportSessionController extends Controller
     /**
      * Record a "report session" registration for the signed-in student.
      *
-     * Reporting is allowed only when both hold: the running academic
-     * session carries an active Session Registration term event, and the
-     * stage the student's course sits at is open for that session. The
-     * module (and its derived year / session) is taken from that stage.
+     * Reporting is allowed only when the stage the student's course sits
+     * at is open for the running session; the offering service applies
+     * the whole rule chain — the offering row and the active Session
+     * Registration window. The module (and its derived year / session)
+     * is taken from that stage.
      */
     public function __invoke(Request $request): JsonResponse
     {
@@ -48,17 +46,6 @@ class ReportSessionController extends Controller
             ]);
         }
 
-        $event = TermEvent::query()
-            ->where('academic_session_id', $session->id)
-            ->where('name', TermEventName::SessionRegistration)
-            ->first();
-
-        if (! $event || ! $event->is_active) {
-            throw ValidationException::withMessages([
-                'session' => 'Session registration is not open for this term.',
-            ]);
-        }
-
         $enrolment = $profile->latestEnrolment()->with('courseStage')->first();
 
         if (! $enrolment || ! $enrolment->course_stage_id || ! $enrolment->courseStage) {
@@ -71,14 +58,9 @@ class ReportSessionController extends Controller
         $result = $this->offerings->isStageOpen($session->id, $stage->id);
 
         if (! $result->open) {
-            $message = match ($result->reason) {
-                StageOpenReason::NoRegistrationWindow => 'Registration dates are not configured for this session.',
-                StageOpenReason::NotYetOpen => 'Registration for this session has not opened yet.',
-                StageOpenReason::WindowEnded => 'Registration for this session has closed.',
-                default => "{$stage->code} is not open for this session.",
-            };
-
-            throw ValidationException::withMessages(['session' => $message]);
+            throw ValidationException::withMessages([
+                'session' => $result->reason->message($stage->code),
+            ]);
         }
 
         $registration = DB::transaction(function () use ($profile, $session, $stage, $request): AcademicSessionRegistration {

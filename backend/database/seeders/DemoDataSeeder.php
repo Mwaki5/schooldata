@@ -9,6 +9,7 @@ use App\Models\AcademicYear;
 use App\Models\CertificationLevel;
 use App\Models\Course;
 use App\Models\CourseEnrolment;
+use App\Models\CourseUnit;
 use App\Models\Curriculum;
 use App\Models\Department;
 use App\Models\ExamBody;
@@ -199,12 +200,13 @@ class DemoDataSeeder extends Seeder
     /**
      * Calendar events bound to their academic session; the current term
      * carries the live ones. Names repeat across sessions, so the session
-     * is part of the identity.
+     * is part of the identity. The `live` row's dates track the seed
+     * date so the demo "Report Session" flow is always inside its window.
      *
-     * @var list<array{session: string, name: string, start_date: string, end_date: string, is_active: bool}>
+     * @var list<array{session: string, name: string, start_date: string|null, end_date: string|null, is_active: bool, live?: bool}>
      */
     private const TERM_EVENTS = [
-        ['session' => 'Term 1, 2026/2027', 'name' => 'Session Registration', 'start_date' => '2026-09-01', 'end_date' => '2026-09-05', 'is_active' => true],
+        ['session' => 'Term 1, 2026/2027', 'name' => 'Session Registration', 'start_date' => null, 'end_date' => null, 'is_active' => true, 'live' => true],
         ['session' => 'Term 1, 2026/2027', 'name' => 'Midterm Exam', 'start_date' => '2026-11-02', 'end_date' => '2026-11-13', 'is_active' => true],
         ['session' => 'Term 1, 2026/2027', 'name' => 'End Term Exams', 'start_date' => '2026-12-14', 'end_date' => '2026-12-18', 'is_active' => false],
         ['session' => 'Term 1, 2026/2027', 'name' => 'School Break', 'start_date' => '2026-12-19', 'end_date' => '2027-01-03', 'is_active' => false],
@@ -348,71 +350,71 @@ class DemoDataSeeder extends Seeder
     /**
      * Units per course; the code is assembled as `{course code} {suffix}`.
      *
-     * @var array<string, list<array{suffix: string, name: string, core: bool}>>
+     * @var array<string, list<array{suffix: string, name: string, unit_type: string}>>
      */
     private const UNITS = [
         'DIT' => [
-            ['suffix' => '1101', 'name' => 'ICT Fundamentals', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Programming Fundamentals', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Database Systems', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Computer Networks', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Entrepreneurship for ICT', 'core' => false],
+            ['suffix' => '1101', 'name' => 'ICT Fundamentals', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Programming Fundamentals', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Database Systems', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Computer Networks', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Entrepreneurship for ICT', 'unit_type' => 'common'],
         ],
         'CIT' => [
-            ['suffix' => '1101', 'name' => 'ICT Applications', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Computer Networking Basics', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Web Design', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Data Communication', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'core' => false],
+            ['suffix' => '1101', 'name' => 'ICT Applications', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Computer Networking Basics', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Web Design', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Data Communication', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'unit_type' => 'common'],
         ],
         'DEEE' => [
-            ['suffix' => '1101', 'name' => 'Electrical Science I', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Electrical Installation I', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Electronics I', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Electrical Drawing', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Project Management', 'core' => false],
+            ['suffix' => '1101', 'name' => 'Electrical Science I', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Electrical Installation I', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Electronics I', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Electrical Drawing', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Project Management', 'unit_type' => 'common'],
         ],
         'CEIE' => [
-            ['suffix' => '1101', 'name' => 'Electrical Science', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Domestic Installation', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Electrical Machine Installation', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Workshop Technology', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'core' => false],
+            ['suffix' => '1101', 'name' => 'Electrical Science', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Domestic Installation', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Electrical Machine Installation', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Workshop Technology', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'unit_type' => 'common'],
         ],
         'DFDT' => [
-            ['suffix' => '1101', 'name' => 'Fashion Design I', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Garment Construction I', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Textile Science', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Pattern Drafting', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Fashion Entrepreneurship', 'core' => false],
+            ['suffix' => '1101', 'name' => 'Fashion Design I', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Garment Construction I', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Textile Science', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Pattern Drafting', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Fashion Entrepreneurship', 'unit_type' => 'common'],
         ],
         'CFDT' => [
-            ['suffix' => '1101', 'name' => 'Garment Construction', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Fashion Illustration', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Textile Studies', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Clothing Production', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'core' => false],
+            ['suffix' => '1101', 'name' => 'Garment Construction', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Fashion Illustration', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Textile Studies', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Clothing Production', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'unit_type' => 'common'],
         ],
         'CBTH' => [
-            ['suffix' => '1101', 'name' => 'Skin Care', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Hair Styling', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Nail Technology', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Salon Management', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Business Entrepreneurship', 'core' => false],
+            ['suffix' => '1101', 'name' => 'Skin Care', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Hair Styling', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Nail Technology', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Salon Management', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Business Entrepreneurship', 'unit_type' => 'common'],
         ],
         'DSWCD' => [
-            ['suffix' => '1101', 'name' => 'Introduction to Community Development', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Social Case Work', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Research Methods', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Counselling Skills', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'core' => false],
+            ['suffix' => '1101', 'name' => 'Introduction to Community Development', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Social Case Work', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Research Methods', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Counselling Skills', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'unit_type' => 'common'],
         ],
         'AEM' => [
-            ['suffix' => '1101', 'name' => 'Building Construction', 'core' => true],
-            ['suffix' => '1102', 'name' => 'Stone Masonry', 'core' => true],
-            ['suffix' => '1103', 'name' => 'Concrete Technology', 'core' => true],
-            ['suffix' => '1104', 'name' => 'Site Organisation', 'core' => true],
-            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'core' => false],
+            ['suffix' => '1101', 'name' => 'Building Construction', 'unit_type' => 'core'],
+            ['suffix' => '1102', 'name' => 'Stone Masonry', 'unit_type' => 'core'],
+            ['suffix' => '1103', 'name' => 'Concrete Technology', 'unit_type' => 'core'],
+            ['suffix' => '1104', 'name' => 'Site Organisation', 'unit_type' => 'core'],
+            ['suffix' => '1201', 'name' => 'Entrepreneurship Skills', 'unit_type' => 'common'],
         ],
     ];
 
@@ -880,26 +882,49 @@ class DemoDataSeeder extends Seeder
 
     /**
      * Calendar events bound to their academic sessions, keyed by session
-     * and event name so re-seeding never duplicates them.
+     * and event name so re-seeding never duplicates them. The `live`
+     * registration window keeps tracking the seed date even on an
+     * already-seeded database, so the demo reporting flow stays open.
      *
      * @param  array<string, AcademicSession>  $sessions
      */
     private function seedTermEvents(array $sessions): void
     {
         foreach (self::TERM_EVENTS as $definition) {
-            TermEvent::firstOrCreate(
+            $isLive = (bool) ($definition['live'] ?? false);
+
+            $dates = $isLive
+                ? [
+                    'start_date' => now()->subDay()->toDateString(),
+                    'end_date' => now()->addDays(6)->toDateString(),
+                ]
+                : [
+                    'start_date' => $definition['start_date'],
+                    'end_date' => $definition['end_date'],
+                ];
+
+            $event = TermEvent::firstOrCreate(
                 [
                     'academic_session_id' => $sessions[$definition['session']]->id,
                     'name' => $definition['name'],
                 ],
                 [
-                    'start_date' => $definition['start_date'],
-                    'end_date' => $definition['end_date'],
+                    ...$dates,
                     'is_active' => $definition['is_active'],
                     'created_by' => $this->adminId,
                     'updated_by' => $this->adminId,
                 ],
             );
+
+            $drifted = $event->start_date->toDateString() !== $dates['start_date']
+                || $event->end_date->toDateString() !== $dates['end_date'];
+
+            if ($isLive && $drifted) {
+                $event->update([
+                    ...$dates,
+                    'updated_by' => $this->adminId,
+                ]);
+            }
         }
 
         $this->command?->info('Term events: '.count(self::TERM_EVENTS).' resolved.');
@@ -1065,7 +1090,7 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
-     * Five units per programme: four core and one elective.
+     * Five units per programme: four core and one common.
      *
      * @param  array<string, Course>  $courses
      * @param  array<string, Curriculum>  $curricula
@@ -1082,27 +1107,53 @@ class DemoDataSeeder extends Seeder
             $course = $courses[$courseCode];
             $curriculum = $curricula[self::COURSES[$courseCode]['curriculum']];
 
-            foreach ($units as $definition) {
-                $core = $definition['core'];
+            foreach ($units as $position => $definition) {
+                $unitType = $definition['unit_type'];
 
-                Unit::firstOrCreate(
+                // Spread the units across the course ladder — the first
+                // two in module 1, then module 2, then module 3 — so every
+                // module, the first one included, has units to register.
+                $module = min(intdiv($position, 2) + 1, 3);
+
+                // Each unit exists once in the catalogue and is then
+                // linked into the course + curriculum that teaches it.
+                $unit = Unit::firstOrCreate(
                     [
-                        'curriculum_id' => $curriculum->id,
-                        'course_id' => $course->id,
                         'code' => $courseCode.' '.$definition['suffix'],
                     ],
                     [
                         'name' => $definition['name'],
-                        'description' => ($core ? 'Core' : 'Elective').' unit of the '.$course->initials.' programme.',
-                        'modules_taught' => $core ? 3 : 2,
-                        'taught_hours' => $core ? 60 : 40,
-                        'credit_factor' => $core ? 2.00 : 1.00,
-                        'core' => $core,
+                        'description' => ucfirst($unitType).' unit of the '.$course->initials.' programme.',
+                        'created_by' => $this->adminId,
+                        'updated_by' => $this->adminId,
+                    ],
+                );
+
+                $courseUnit = CourseUnit::firstOrCreate(
+                    [
+                        'unit_id' => $unit->id,
+                        'course_id' => $course->id,
+                        'curriculum_id' => $curriculum->id,
+                    ],
+                    [
+                        'modules_taught' => $module,
+                        'taught_hours' => $unitType === 'core' ? 60 : 40,
+                        'credit_factor' => $unitType === 'core' ? 2.00 : 1.00,
+                        'unit_type' => $unitType,
                         'is_active' => true,
                         'created_by' => $this->adminId,
                         'updated_by' => $this->adminId,
                     ],
                 );
+
+                // Re-seeding converges demo rows onto that spread too, so
+                // databases seeded before it existed gain module-1 units.
+                if ($courseUnit->modules_taught !== $module) {
+                    $courseUnit->update([
+                        'modules_taught' => $module,
+                        'updated_by' => $this->adminId,
+                    ]);
+                }
 
                 $count++;
             }
@@ -1121,6 +1172,15 @@ class DemoDataSeeder extends Seeder
      */
     private function seedStudents(array $courses, array $curricula, array $levels, array $sessions): void
     {
+        // Every demo enrolment starts on its course's first stage — the
+        // stage seedSessionOfferings() opens — so the student "Report
+        // Session" flow works end to end in the demo data.
+        $firstStageIds = [];
+
+        foreach ($courses as $course) {
+            $firstStageIds[$course->id] = $course->stages()->where('module_no', 1)->value('id');
+        }
+
         foreach (self::STUDENTS as $definition) {
             $user = User::firstOrCreate(
                 ['login_id' => $definition['admission_no']],
@@ -1175,6 +1235,7 @@ class DemoDataSeeder extends Seeder
                 [
                     'curriculum_id' => $curricula[$courseDefinition['curriculum']]->id,
                     'certification_level_id' => $levels[$courseDefinition['level']]->id,
+                    'course_stage_id' => $firstStageIds[$courses[$definition['course']]->id] ?? null,
                     'enrolment_date' => $definition['enrolment_date'],
                     'status' => $definition['enrolment_status'],
                     'remarks' => $definition['remarks'],
@@ -1183,6 +1244,21 @@ class DemoDataSeeder extends Seeder
                 ],
             );
         }
+
+        // Databases seeded before stages existed keep stage-less rows;
+        // re-seeding heals them onto the same first stage.
+        CourseEnrolment::query()
+            ->whereNull('course_stage_id')
+            ->whereNotNull('course_id')
+            ->whereIn('student_id', StudentProfile::query()->pluck('id'))
+            ->get()
+            ->each(function (CourseEnrolment $enrolment) use ($firstStageIds): void {
+                $stageId = $firstStageIds[$enrolment->course_id] ?? null;
+
+                if ($stageId !== null) {
+                    $enrolment->update(['course_stage_id' => $stageId]);
+                }
+            });
 
         $this->command?->info('Students: '.count(self::STUDENTS).' with accounts and enrolments.');
     }

@@ -11,18 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // The unit catalogue: a unit's own identity (code, name,
+        // description), independent of any course. How a unit is delivered
+        // inside a course — module, hours, credit, core, active — lives on
+        // `course_units`.
         Schema::create('units', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('course_id')->constrained('courses');
-            $table->foreignId('curriculum_id')->constrained('curricula');
             $table->string('code', 50);
             $table->string('name');
             $table->text('description')->nullable();
-            $table->unsignedSmallInteger('modules_taught')->nullable();
-            $table->unsignedSmallInteger('taught_hours')->nullable();
-            $table->decimal('credit_factor', 10, 2)->nullable();
-            $table->boolean('core')->default(true);
-            $table->boolean('is_active')->default(true);
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
@@ -30,16 +27,12 @@ return new class extends Migration
             // the unique index below never collides on a shared timestamp.
             $table->softDeletes('deleted_at', 6);
 
-            // A course is delivered per curriculum, and a unit's code
-            // identifies it inside that pair: another course — or another
-            // curriculum of the same course — may reuse the same code for
-            // a genuinely different unit. Soft-deleted rows free their
-            // code for reuse, matching the app's soft-delete conventions
+            // The code identifies the unit in the catalogue, free to be
+            // linked into any course. Soft-deleted rows release their code
+            // for reuse, matching the app's soft-delete conventions
             // everywhere else (MySQL has no partial indexes, so
-            // `deleted_at` joins the key instead).
-            $table->unique(['curriculum_id', 'course_id', 'code', 'deleted_at']);
-
-            $table->index(['course_id', 'curriculum_id']);
+            // `deleted_at` joins the key).
+            $table->unique(['code', 'deleted_at']);
         });
     }
 

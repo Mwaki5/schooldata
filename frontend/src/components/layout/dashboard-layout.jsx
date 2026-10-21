@@ -56,6 +56,7 @@ const NAV_ITEMS = [
       { label: 'Curriculum', to: '/curricula', roles: ['admin'] },
       { label: 'Courses', to: '/courses', roles: ['admin'] },
       { label: 'Units', to: '/units', roles: ['admin'] },
+      { label: 'Course Units', to: '/course-units', roles: ['admin'] },
       // Students only ever see their own course's units, never the
       // admin catalogue.
       { label: 'My Units', to: '/my-units', roles: ['student'] },
@@ -73,7 +74,14 @@ const NAV_ITEMS = [
     ],
   },
   { label: 'Attendance', icon: CalendarCheck, disabled: true },
-  { label: 'Exams & Grades', icon: ClipboardList, disabled: true },
+  {
+    label: 'Exams & Grades',
+    icon: ClipboardList,
+    roles: ['admin', 'trainer'],
+    children: [
+      { label: 'Unit Grading', to: '/unit-grades', roles: ['admin', 'trainer'] },
+    ],
+  },
   { label: 'Fees', icon: Wallet, disabled: true },
 ]
 
@@ -88,11 +96,13 @@ const PAGE_TITLES = {
   '/curricula': 'Curriculum',
   '/courses': 'Courses',
   '/units': 'Units',
+  '/course-units': 'Course Units',
   '/my-units': 'My Units',
   '/academic-years': 'Academic Years',
   '/academic-sessions': 'Academic Sessions',
   '/session-offerings': 'Open Session',
   '/term-events': 'Term Events',
+  '/unit-grades': 'Unit Grading',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',

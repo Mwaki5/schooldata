@@ -7,57 +7,59 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Units\StoreUnitRequest;
 use App\Http\Requests\Units\UpdateUnitRequest;
 use App\Http\Resources\Units\UnitResource;
-use App\Models\Course;
 use App\Models\Unit;
+use App\Models\UnitRegistration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class UnitController extends Controller
 {
     use PaginatesLists;
 
     /**
-     * List unit offerings with the shared search / sort / pagination
-     * contract, filterable down to one course and curriculum.
+     * List catalogue units with the shared search / sort / pagination
+     * contract, optionally narrowed down to the units linked into one
+     * course or curriculum.
      *
-     * Each row is one delivery of a unit inside a course + curriculum
-     * pair; the same code may appear once per pair.
+     * Each row is one unit in the catalogue; its deliveries inside
+     * courses live on `course_units` (see CourseUnitController).
      */
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
             'course_id' => ['nullable', 'integer'],
             'curriculum_id' => ['nullable', 'integer'],
-            'is_active' => ['nullable', 'boolean'],
         ]);
 
         $paginator = $this->paginateList(
             $request,
-            Unit::query()->with(['course.certificationLevel', 'course.department', 'curriculum.examBody']),
+            Unit::query()->withCount('courseUnits'),
             searchable: ['code', 'name', 'description'],
             sortable: [
                 'code' => 'code',
                 'name' => 'name',
-                'course_id' => 'course_id',
-                'is_active' => 'is_active',
                 'created_at' => 'created_at',
             ],
-            defaultOrder: [['name', 'asc']],
+            defaultOrder: [['code', 'asc']],
             applyFilters: function (Builder $query) use ($filters): void {
                 $query
                     ->when(
                         ! empty($filters['course_id']),
-                        fn ($query) => $query->where('course_id', (int) $filters['course_id']),
+                        fn ($query) => $query->whereHas(
+                            'courseUnits',
+                            fn ($link) => $link->where('course_id', (int) $filters['course_id']),
+                        ),
                     )
                     ->when(
                         ! empty($filters['curriculum_id']),
-                        fn ($query) => $query->where('curriculum_id', (int) $filters['curriculum_id']),
-                    )
-                    ->when(
-                        array_key_exists('is_active', $filters) && $filters['is_active'] !== null,
-                        fn ($query) => $query->where('is_active', (bool) $filters['is_active']),
+                        fn ($query) => $query->whereHas(
+                            'courseUnits',
+                            fn ($link) => $link->where('curriculum_id', (int) $filters['curriculum_id']),
+                        ),
                     );
             },
         );
@@ -69,9 +71,9 @@ class UnitController extends Controller
     }
 
     /**
-     * Create a unit offering for one course + curriculum, stamping the
-     * creating user. The same code may already exist under a different
-     * course or curriculum; within this pair it must be unique.
+     * Create a catalogue unit — step one of the unit wizard. How the
+     * unit is taught inside a course is linked in step two through
+     * POST /course-units.
      */
     public function store(StoreUnitRequest $request): JsonResponse
     {
@@ -82,45 +84,29 @@ class UnitController extends Controller
         ]);
 
         return response()->json([
-            'unit' => new UnitResource($unit->load(['course.certificationLevel', 'course.department', 'curriculum.examBody'])),
+            'unit' => new UnitResource($unit->loadCount('courseUnits')),
         ], Response::HTTP_CREATED);
     }
 
     /**
-     * Show a single unit offering with its course and curriculum.
+     * Show a single catalogue unit with every course it is linked into.
      */
     public function show(Unit $unit): JsonResponse
     {
         return response()->json([
-            'unit' => new UnitResource($unit->load(['course.certificationLevel', 'course.department', 'curriculum.examBody'])),
+            'unit' => new UnitResource(
+                $unit->loadCount('courseUnits')->load([
+                    'courseUnits.course.certificationLevel',
+                    'courseUnits.course.department',
+                    'courseUnits.curriculum.examBody',
+                ]),
+            ),
         ]);
     }
 
     /**
-     * List every unit offered under one course — for reviewing what a
-     * course actually teaches, grouped by curriculum by the caller.
-     */
-    public function byCourse(Course $course): JsonResponse
-    {
-        $units = $course->units()
-            ->with('curriculum.examBody')
-            ->orderBy('id')
-            ->get()
-            // Sorted by curriculum name, which a portable SQL order
-            // cannot reach without joins; the collection is small.
-            ->sortBy([
-                fn (Unit $left, Unit $right) => strcasecmp($left->curriculum?->name ?? '', $right->curriculum?->name ?? ''),
-                fn (Unit $left, Unit $right) => strcasecmp($left->name, $right->name),
-            ])
-            ->values();
-
-        return response()->json([
-            'units' => UnitResource::collection($units),
-        ]);
-    }
-
-    /**
-     * Update a unit offering, stamping the updating user.
+     * Update a catalogue unit's own details, stamping the updating
+     * user. Its course links are managed through /course-units.
      */
     public function update(UpdateUnitRequest $request, Unit $unit): JsonResponse
     {
@@ -130,17 +116,33 @@ class UnitController extends Controller
         ]);
 
         return response()->json([
-            'unit' => new UnitResource($unit->refresh()->load(['course.certificationLevel', 'course.department', 'curriculum.examBody'])),
+            'unit' => new UnitResource($unit->refresh()->loadCount('courseUnits')),
         ]);
     }
 
     /**
-     * Soft delete a unit offering, freeing its code for reuse within
-     * the course + curriculum pair.
+     * Soft delete a catalogue unit, freeing its code for reuse. Its
+     * course links are removed first — they describe deliveries of a
+     * unit that no longer exists — but only when no student registered
+     * against them: registrations (and their marks) hold the link, and
+     * the database restricts the delete as a backstop.
      */
     public function destroy(Unit $unit): Response
     {
-        $unit->delete();
+        $isRegistered = UnitRegistration::query()
+            ->whereIn('course_unit_id', $unit->courseUnits()->select('id'))
+            ->exists();
+
+        if ($isRegistered) {
+            throw ValidationException::withMessages([
+                'unit' => 'Students have registered this unit, so it cannot be removed. Mark its course links inactive instead.',
+            ]);
+        }
+
+        DB::transaction(function () use ($unit): void {
+            $unit->courseUnits()->delete();
+            $unit->delete();
+        });
 
         return response()->noContent();
     }

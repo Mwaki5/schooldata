@@ -3,6 +3,7 @@
 use App\Enums\Role;
 use App\Models\Course;
 use App\Models\CourseEnrolment;
+use App\Models\CourseUnit;
 use App\Models\Curriculum;
 use App\Models\StudentProfile;
 use App\Models\Unit;
@@ -14,6 +15,30 @@ function myUnitsAccessTokenFor(User $user): string
     JWTAuth::factory()->setTTL((int) config('jwt.ttl'));
 
     return JWTAuth::claims(['type' => 'access'])->fromUser($user);
+}
+
+/**
+ * A unit offered by one course + curriculum: the catalogue entry plus
+ * its active course-unit link. Unit fields (code, name) go on the unit;
+ * delivery fields go on the link.
+ */
+function myUnitsUnit(Course $course, Curriculum $curriculum, array $overrides = []): Unit
+{
+    $unitFields = array_intersect_key($overrides, array_flip(['code', 'name', 'description']));
+    $linkFields = array_intersect_key($overrides, array_flip(['modules_taught', 'taught_hours', 'credit_factor', 'unit_type', 'is_active']));
+
+    $unit = Unit::factory()->create($unitFields);
+
+    CourseUnit::factory()->create(array_merge([
+        'unit_id' => $unit->id,
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'modules_taught' => 1,
+        'unit_type' => 'core',
+        'is_active' => true,
+    ], $linkFields));
+
+    return $unit;
 }
 
 test('my units requires an access token', function () {
@@ -52,60 +77,43 @@ test('my units groups the units of every enrolment by course and curriculum', fu
         'status' => 'ENROLLED',
     ]);
 
-    Unit::factory()->create([
-        'course_id' => $diploma->id,
-        'curriculum_id' => $diplomaCurriculum->id,
+    myUnitsUnit($diploma, $diplomaCurriculum, [
         'code' => 'DIT 1102',
         'name' => 'Programming Fundamentals',
         'modules_taught' => 3,
-        'core' => true,
-        'is_active' => true,
+        'unit_type' => 'core',
     ]);
-    Unit::factory()->create([
-        'course_id' => $diploma->id,
-        'curriculum_id' => $diplomaCurriculum->id,
+    myUnitsUnit($diploma, $diplomaCurriculum, [
         'code' => 'DIT 1101',
         'name' => 'ICT Fundamentals',
         'modules_taught' => 3,
-        'core' => true,
-        'is_active' => true,
+        'unit_type' => 'core',
     ]);
-    Unit::factory()->create([
-        'course_id' => $diploma->id,
-        'curriculum_id' => $diplomaCurriculum->id,
+    myUnitsUnit($diploma, $diplomaCurriculum, [
         'code' => 'DIT 1201',
         'name' => 'Entrepreneurship for ICT',
         'modules_taught' => 2,
-        'core' => false,
-        'is_active' => true,
+        'unit_type' => 'common',
     ]);
-    Unit::factory()->create([
-        'course_id' => $diploma->id,
-        'curriculum_id' => $diplomaCurriculum->id,
+    myUnitsUnit($diploma, $diplomaCurriculum, [
         'code' => 'DIT 1301',
         'name' => 'Industrial Attachment',
         'modules_taught' => null,
-        'core' => true,
-        'is_active' => true,
+        'unit_type' => 'core',
     ]);
-    // Retired units are not offered to students.
-    Unit::factory()->create([
-        'course_id' => $diploma->id,
-        'curriculum_id' => $diplomaCurriculum->id,
+    // Retired deliveries are not offered to students.
+    myUnitsUnit($diploma, $diplomaCurriculum, [
         'code' => 'DIT 9999',
         'name' => 'Retired Unit',
         'modules_taught' => 3,
-        'core' => true,
+        'unit_type' => 'core',
         'is_active' => false,
     ]);
-    Unit::factory()->create([
-        'course_id' => $certificate->id,
-        'curriculum_id' => $certificateCurriculum->id,
+    myUnitsUnit($certificate, $certificateCurriculum, [
         'code' => 'CIT 1101',
         'name' => 'ICT Applications',
         'modules_taught' => 3,
-        'core' => true,
-        'is_active' => true,
+        'unit_type' => 'core',
     ]);
 
     $this->withToken(myUnitsAccessTokenFor($user))
@@ -115,13 +123,13 @@ test('my units groups the units of every enrolment by course and curriculum', fu
             'groups' => [[
                 'course' => ['id', 'initials', 'name'],
                 'curriculum' => ['id', 'name'],
-                'stats' => ['total', 'core', 'elective'],
+                'stats' => ['total', 'basic', 'core', 'common'],
                 'modules' => [[
                     'modules_taught',
                     'total',
                     'units' => [[
-                        'id', 'code', 'name', 'modules_taught', 'taught_hours',
-                        'credit_factor', 'core', 'is_active',
+                        'id', 'code', 'name', 'description', 'taught_hours',
+                        'credit_factor', 'unit_type',
                     ]],
                 ]],
             ]],
@@ -132,7 +140,8 @@ test('my units groups the units of every enrolment by course and curriculum', fu
         ->assertJsonPath('groups.1.curriculum.name', 'TVET Diploma Curriculum')
         ->assertJsonPath('groups.1.stats.total', 4)
         ->assertJsonPath('groups.1.stats.core', 3)
-        ->assertJsonPath('groups.1.stats.elective', 1)
+        ->assertJsonPath('groups.1.stats.common', 1)
+        ->assertJsonPath('groups.1.stats.basic', 0)
         ->assertJsonCount(3, 'groups.1.modules')
         // Modules ascend by count; units without a count come last.
         ->assertJsonPath('groups.1.modules.0.modules_taught', 2)
@@ -152,9 +161,7 @@ test('my units groups the units of every enrolment by course and curriculum', fu
 test('my units never leaks another student\'s course units', function () {
     $course = Course::factory()->create(['name' => 'Diploma in ICT']);
     $curriculum = Curriculum::factory()->create();
-    Unit::factory()->create([
-        'course_id' => $course->id,
-        'curriculum_id' => $curriculum->id,
+    myUnitsUnit($course, $curriculum, [
         'code' => 'DIT 1101',
     ]);
 

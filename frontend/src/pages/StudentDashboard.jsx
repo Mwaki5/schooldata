@@ -13,6 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { UnitTypeBadge } from '@/components/unit-type-badge'
 import { useAuth } from '@/context/AuthContext'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -21,11 +23,6 @@ const ENROLMENT_STATUS_STYLES = {
   ENROLLED: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   COMPLETED: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
   DROPPED: 'bg-destructive/10 text-destructive',
-}
-
-const PROFILE_STATUS_STYLES = {
-  active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  inactive: 'bg-muted text-muted-foreground',
 }
 
 function StatusBadge({ status, styles }) {
@@ -56,10 +53,6 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
 }
 
-function capitalize(value) {
-  return value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : '—'
-}
-
 function StatCard({ label, value, icon: Icon }) {
   return (
     <Card>
@@ -78,23 +71,15 @@ function StatCard({ label, value, icon: Icon }) {
   )
 }
 
-function DetailRow({ label, children }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-right text-sm">{children}</span>
-    </div>
-  )
-}
-
 export default function StudentDashboard() {
   const { user } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [reporting, setReporting] = useState(false)
+  const [sessionUnits, setSessionUnits] = useState(null)
+  const [selectedUnits, setSelectedUnits] = useState(() => new Set())
+  const [registering, setRegistering] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -117,6 +102,27 @@ export default function StudentDashboard() {
         if (active) {
           setLoading(false)
         }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // The units offered for the running session; only shown once the student
+  // has reported, so a failure simply keeps the section hidden.
+  useEffect(() => {
+    let active = true
+
+    api
+      .get('/me/session-units')
+      .then((response) => {
+        if (active) {
+          setSessionUnits(response.data)
+        }
+      })
+      .catch(() => {
+        // The section stays hidden without one.
       })
 
     return () => {
@@ -155,6 +161,16 @@ export default function StudentDashboard() {
             }
           : current,
       )
+
+      // The session units appear the moment the student has reported.
+      api
+        .get('/me/session-units')
+        .then((refresh) => {
+          setSessionUnits(refresh.data)
+        })
+        .catch(() => {
+          // The units section stays hidden; the report itself succeeded.
+        })
     } catch (error) {
       toast.error(
         error.response?.data?.message ??
@@ -163,6 +179,65 @@ export default function StudentDashboard() {
       )
     } finally {
       setReporting(false)
+    }
+  }
+
+  const offeredUnits = sessionUnits?.reported ? sessionUnits.units : []
+
+  const toggleUnit = (unitId, checked) => {
+    setSelectedUnits((current) => {
+      const next = new Set(current)
+
+      if (checked) {
+        next.add(unitId)
+      } else {
+        next.delete(unitId)
+      }
+
+      return next
+    })
+  }
+
+  // Register the ticked units. The server only records units that are
+  // offered and not yet registered, so the response lists the new ones.
+  const handleRegisterUnits = async () => {
+    setRegistering(true)
+
+    try {
+      const { data } = await api.post('/me/session-units', {
+        course_units: [...selectedUnits],
+      })
+
+      const recorded = new Set(data.registered)
+
+      setSessionUnits((current) =>
+        current
+          ? {
+              ...current,
+              units: current.units.map((unit) =>
+                recorded.has(unit.course_unit_id)
+                  ? { ...unit, registered: true }
+                  : unit,
+              ),
+            }
+          : current,
+      )
+      setSelectedUnits(new Set())
+
+      toast.success(
+        recorded.size > 0
+          ? `Registered ${recorded.size} unit${recorded.size === 1 ? '' : 's'} ` +
+              `for ${sessionUnits?.session?.name ?? 'this session'}.`
+          : 'The selected units were already registered.',
+      )
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ??
+          error.response?.data?.errors?.course_units?.[0] ??
+          'Unable to register the selected units.',
+      )
+    } finally {
+      setRegistering(false)
     }
   }
 
@@ -218,17 +293,34 @@ export default function StudentDashboard() {
           </div>
 
           <div className="flex flex-col items-start gap-1 sm:items-end">
-            <button
-              type="button"
-              onClick={handleReport}
-              disabled={!report?.can_report || reporting || loading}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ClipboardList className="h-4 w-4" aria-hidden="true" />
-              {reporting ? 'Reporting…' : 'Report Session'}
-            </button>
-            {!report?.can_report && report?.reason && (
-              <p className="text-xs text-muted-foreground">{report.reason}</p>
+            {report?.year_no && report?.session_no && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Your Level
+                </p>
+                <p className="text-sm font-medium">
+                  Year {report.year_no} · Session {report.session_no}
+                </p>
+              </div>
+            )}
+            {/* Only offered when the student can actually act on it — the
+                server decides eligibility (stage open + window live). */}
+            {report?.can_report ? (
+              <button
+                type="button"
+                onClick={handleReport}
+                disabled={reporting || loading}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ClipboardList className="h-4 w-4" aria-hidden="true" />
+                {reporting ? 'Reporting…' : 'Report Session'}
+              </button>
+            ) : (
+              report?.reason && (
+                <p className="max-w-xs text-xs text-muted-foreground sm:text-right">
+                  {report.reason}
+                </p>
+              )
             )}
           </div>
         </CardContent>
@@ -315,65 +407,72 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>My Profile</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!profile ? (
+        {sessionUnits?.reported && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Units</CardTitle>
               <p className="text-sm text-muted-foreground">
-                No student profile is linked to this account yet. Contact the
-                registrar.
+                {offeredUnits.length > 0
+                  ? `Units taught in module ${sessionUnits.module_no} this session — tick to register.`
+                  : `No units are taught in module ${sessionUnits.module_no} for this session yet.`}
               </p>
-            ) : (
-              <>
-                <div className="divide-y">
-                  <DetailRow label="Status">
-                    <StatusBadge
-                      status={profile.status}
-                      styles={PROFILE_STATUS_STYLES}
-                    />
-                  </DetailRow>
-                  <DetailRow label="Gender">
-                    {capitalize(profile.gender)}
-                  </DetailRow>
-                  <DetailRow label="Date of Birth">
-                    {formatDate(profile.date_of_birth)}
-                  </DetailRow>
-                  <DetailRow label="County">
-                    {profile.county ?? '—'}
-                  </DetailRow>
-                  <DetailRow label="Phone">
-                    {profile.phone ?? '—'}
-                  </DetailRow>
-                  <DetailRow label="National ID">
-                    {profile.national_id ?? '—'}
-                  </DetailRow>
-                  <DetailRow label="Email">
-                    {profile.email ?? user?.email ?? '—'}
-                  </DetailRow>
-                </div>
-
-                {profile.sponsored && (
-                  <div className="mt-4 rounded-xl border bg-muted/40 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                      Sponsorship
-                    </p>
-                    <p className="mt-1 text-sm font-medium">
-                      {profile.sponsored_by ?? 'Sponsored'}
-                    </p>
-                    {profile.index_no && (
-                      <p className="text-xs text-muted-foreground">
-                        Index no. {profile.index_no}
-                        {profile.exam_year && ` · Exam year ${profile.exam_year}`}
-                      </p>
+              {offeredUnits.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleRegisterUnits}
+                  disabled={registering || selectedUnits.size === 0}
+                  className="mt-2 inline-flex self-start items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
+                  {registering
+                    ? 'Registering…'
+                    : `Register Units${selectedUnits.size > 0 ? ` (${selectedUnits.size})` : ''}`}
+                </button>
+              )}
+            </CardHeader>
+            {offeredUnits.length > 0 && (
+              <CardContent className="space-y-2">
+                {offeredUnits.map((unit) => (
+                  <label
+                    key={unit.course_unit_id}
+                    className={cn(
+                      'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2.5',
+                      unit.registered
+                        ? 'border-emerald-500/30 bg-emerald-500/5'
+                        : 'cursor-pointer hover:bg-muted/50',
                     )}
-                  </div>
-                )}
-              </>
+                  >
+                    <Checkbox
+                      checked={
+                        unit.registered || selectedUnits.has(unit.course_unit_id)
+                      }
+                      disabled={unit.registered}
+                      onChange={(event) =>
+                        toggleUnit(unit.course_unit_id, event.target.checked)
+                      }
+                    />
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {unit.code}
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-medium">
+                      {unit.name}
+                    </span>
+                    <UnitTypeBadge type={unit.unit_type} />
+                    <span className="text-xs text-muted-foreground">
+                      {unit.credit_factor} cr
+                    </span>
+                    {unit.registered && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                        Registered
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </CardContent>
             )}
-          </CardContent>
-        </Card>
+          </Card>
+        )}
       </div>
     </div>
   )

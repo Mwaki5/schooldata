@@ -51,9 +51,11 @@ class OfferingService
     }
 
     /**
-     * The registration window assigned to a session by its Session
-     * Registration term event. Dates are inclusive: the window opens at
-     * the start of the first day and closes at the end of the last day.
+     * The registration window assigned to a session by its ACTIVE Session
+     * Registration term event: an inactive event assigns no window, so
+     * the wizard, the admin enrolment path and student reporting all
+     * honour the same rule. Dates are inclusive: the window opens at the
+     * start of the first day and closes at the end of the last day.
      *
      * @return array{event: TermEvent, opens_at: Carbon, closes_at: Carbon}|null
      */
@@ -62,6 +64,7 @@ class OfferingService
         $event = TermEvent::query()
             ->where('academic_session_id', $academicSessionId)
             ->where('name', TermEventName::SessionRegistration)
+            ->where('is_active', true)
             ->first();
 
         if ($event === null) {

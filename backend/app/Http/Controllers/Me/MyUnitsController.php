@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Me;
 
+use App\Enums\UnitType;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Units\UnitResource;
 use App\Models\Course;
 use App\Models\CourseEnrolment;
+use App\Models\CourseUnit;
 use App\Models\Curriculum;
-use App\Models\Unit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -46,20 +46,24 @@ class MyUnitsController extends Controller
             ->get(['id', 'name'])
             ->keyBy('id');
 
-        // One query for every unit the student may see, split by pair in
-        // memory. Only active units are offered, so retired ones stay off
-        // the student's page.
-        $unitsByPair = Unit::query()
-            ->where('is_active', true)
-            ->whereIn('course_id', $pairs->pluck('course_id'))
-            ->whereIn('curriculum_id', $pairs->pluck('curriculum_id'))
-            ->orderBy('code')
-            ->orderBy('name')
+        // One query for every course-unit link the student may see,
+        // split by pair in memory. Only active links are offered, so
+        // retired deliveries stay off the student's page.
+        $linksByPair = CourseUnit::query()
+            ->join('units', 'units.id', '=', 'course_units.unit_id')
+            ->whereNull('units.deleted_at')
+            ->where('course_units.is_active', true)
+            ->whereIn('course_units.course_id', $pairs->pluck('course_id'))
+            ->whereIn('course_units.curriculum_id', $pairs->pluck('curriculum_id'))
+            ->select('course_units.*')
+            ->with('unit')
+            ->orderBy('units.code')
+            ->orderBy('units.name')
             ->get()
-            ->groupBy(fn (Unit $unit): string => $unit->course_id.'-'.$unit->curriculum_id);
+            ->groupBy(fn (CourseUnit $link): string => $link->course_id.'-'.$link->curriculum_id);
 
         $groups = $pairs
-            ->map(function (CourseEnrolment $enrolment) use ($courses, $curricula, $unitsByPair): ?array {
+            ->map(function (CourseEnrolment $enrolment) use ($courses, $curricula, $linksByPair): ?array {
                 $course = $courses->get($enrolment->course_id);
                 $curriculum = $curricula->get($enrolment->curriculum_id);
 
@@ -67,17 +71,27 @@ class MyUnitsController extends Controller
                     return null;
                 }
 
-                $units = $unitsByPair->get($enrolment->course_id.'-'.$enrolment->curriculum_id, collect());
+                $links = $linksByPair->get($enrolment->course_id.'-'.$enrolment->curriculum_id, collect());
 
-                // Inside the course + curriculum group, the units are
+                // Inside the course + curriculum group, the links are
                 // sectioned by the module number they are taught in;
-                // units without a module come last.
-                $modules = $units
-                    ->groupBy(fn (Unit $unit): string => $unit->modules_taught === null ? 'none' : (string) $unit->modules_taught)
-                    ->map(fn ($moduleUnits, string $key): array => [
+                // links without a module come last.
+                $modules = $links
+                    ->groupBy(fn (CourseUnit $link): string => $link->modules_taught === null ? 'none' : (string) $link->modules_taught)
+                    ->map(fn ($moduleLinks, string $key): array => [
                         'modules_taught' => $key === 'none' ? null : (int) $key,
-                        'total' => $moduleUnits->count(),
-                        'units' => UnitResource::collection($moduleUnits->values()),
+                        'total' => $moduleLinks->count(),
+                        'units' => $moduleLinks
+                            ->map(fn (CourseUnit $link): array => [
+                                'id' => $link->unit_id,
+                                'code' => $link->unit->code,
+                                'name' => $link->unit->name,
+                                'description' => $link->unit->description,
+                                'unit_type' => $link->unit_type->value,
+                                'taught_hours' => $link->taught_hours,
+                                'credit_factor' => $link->credit_factor,
+                            ])
+                            ->values(),
                     ])
                     ->sortBy(fn (array $module): int => $module['modules_taught'] ?? PHP_INT_MAX)
                     ->values();
@@ -93,9 +107,10 @@ class MyUnitsController extends Controller
                         'name' => $curriculum->name,
                     ],
                     'stats' => [
-                        'total' => $units->count(),
-                        'core' => $units->where('core', true)->count(),
-                        'elective' => $units->where('core', false)->count(),
+                        'total' => $links->count(),
+                        'basic' => $links->where('unit_type', UnitType::Basic)->count(),
+                        'core' => $links->where('unit_type', UnitType::Core)->count(),
+                        'common' => $links->where('unit_type', UnitType::Common)->count(),
                     ],
                     'modules' => $modules,
                 ];
