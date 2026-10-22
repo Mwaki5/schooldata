@@ -314,7 +314,9 @@ test('a missing item or structure returns 404', function () {
 });
 
 test('fee structure payloads carry the summed item total', function () {
-    $structure = FeeStructure::factory()->create();
+    // Pinned names: the list is ordered by name, so the assertion must
+    // not depend on the factory's random draw.
+    $structure = FeeStructure::factory()->create(['name' => 'A Total Plan']);
     FeeStructureItem::factory()->create([
         'fee_structure_id' => $structure->id,
         'amount' => 45000,
@@ -323,7 +325,7 @@ test('fee structure payloads carry the summed item total', function () {
         'fee_structure_id' => $structure->id,
         'amount' => 5000,
     ]);
-    $empty = FeeStructure::factory()->create();
+    $empty = FeeStructure::factory()->create(['name' => 'B Total Plan']);
     $token = feeStructureItemsAccessTokenFor(User::factory()->create());
 
     $this->withToken($token)

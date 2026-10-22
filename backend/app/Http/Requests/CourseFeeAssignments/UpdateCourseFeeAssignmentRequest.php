@@ -18,10 +18,21 @@ class UpdateCourseFeeAssignmentRequest extends FormRequest
     }
 
     /**
+     * A per-year fee spans its whole year, so any incoming session
+     * number is dropped before validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('span') !== FeeSpan::Session->value) {
+            $this->merge(['session_no' => null]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
-     * The assignment may be corrected or moved to another pair, but the
-     * destination pair may still charge under only one live assignment
+     * The assignment may be corrected or moved to another slot, but the
+     * destination slot may still charge under only one live assignment
      * (this one excluded).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -35,10 +46,6 @@ class UpdateCourseFeeAssignmentRequest extends FormRequest
                 'required',
                 'integer',
                 Rule::exists('courses', 'id')->whereNull('deleted_at'),
-                Rule::unique('course_fee_assignments', 'course_id')
-                    ->where('curriculum_id', $this->input('curriculum_id'))
-                    ->whereNull('deleted_at')
-                    ->ignore($assignmentId),
             ],
             'curriculum_id' => [
                 'required',
@@ -51,6 +58,25 @@ class UpdateCourseFeeAssignmentRequest extends FormRequest
                 Rule::exists('fee_structures', 'id')->whereNull('deleted_at'),
             ],
             'span' => ['required', 'string', Rule::enum(FeeSpan::class)],
+            'year_no' => [
+                'required',
+                'integer',
+                'min:1',
+                'max:255',
+                Rule::unique('course_fee_assignments', 'year_no')
+                    ->where('course_id', $this->input('course_id'))
+                    ->where('curriculum_id', $this->input('curriculum_id'))
+                    ->where('session_no', $this->input('session_no'))
+                    ->whereNull('deleted_at')
+                    ->ignore($assignmentId),
+            ],
+            'session_no' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:255',
+                'required_if:span,'.FeeSpan::Session->value,
+            ],
         ];
     }
 }

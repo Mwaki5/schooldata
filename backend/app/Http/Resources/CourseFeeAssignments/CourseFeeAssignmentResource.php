@@ -23,6 +23,9 @@ class CourseFeeAssignmentResource extends JsonResource
             'curriculum_id' => $this->curriculum_id,
             'fee_structure_id' => $this->fee_structure_id,
             'span' => $this->span->value,
+            'year_no' => $this->year_no,
+            // Empty for a per-year fee, which spans its whole year.
+            'session_no' => $this->session_no,
             // Nested on list payloads whenever the controller
             // eager-loads the relations.
             'course' => new CourseResource($this->whenLoaded('course')),

@@ -89,9 +89,9 @@ export default function CourseFeeAssignments() {
             Course Fee Assignments
           </h1>
           <p className="text-sm text-muted-foreground">
-            The fee structure each course + curriculum pair charges, and whether
-            it repeats per session or per year. A student&rsquo;s enrolment
-            carries the pair, so their fee is found here.
+            The fee structure each course + curriculum pair charges per year of
+            study — and per session, when it repeats that way. A student&rsquo;s
+            enrolment carries the pair, so their fee is found here.
           </p>
         </div>
         <Link to="/course-fee-assignments/create" className={buttonVariants()}>
@@ -130,14 +130,30 @@ export default function CourseFeeAssignments() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[960px] text-sm">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-3 font-medium">Course</th>
-                      <th className="pb-3 font-medium">Curriculum</th>
-                      <th className="pb-3 font-medium">Fee Structure</th>
-                      <th className="pb-3 text-right font-medium">
+                      <th className="pb-3 font-medium whitespace-nowrap">
+                        Course
+                      </th>
+                      <th className="pb-3 font-medium whitespace-nowrap">
+                        Curriculum
+                      </th>
+                      <th className="pb-3 font-medium whitespace-nowrap">
+                        Fee Structure
+                      </th>
+                      <th className="pb-3 text-right font-medium whitespace-nowrap">
                         Fee Amount
+                      </th>
+                      <SortableTh
+                        column="year"
+                        label="Year"
+                        sort={sort}
+                        order={order}
+                        onSort={toggleSort}
+                      />
+                      <th className="pb-3 font-medium whitespace-nowrap">
+                        Session
                       </th>
                       <SortableTh
                         column="span"
@@ -146,7 +162,9 @@ export default function CourseFeeAssignments() {
                         order={order}
                         onSort={toggleSort}
                       />
-                      <th className="pb-3 text-right font-medium">Actions</th>
+                      <th className="pb-3 text-right font-medium whitespace-nowrap">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -163,6 +181,10 @@ export default function CourseFeeAssignments() {
                         </td>
                         <td className="py-3 text-right tabular-nums">
                           {amountFormat.format(assignment.fee_structure?.total ?? 0)}
+                        </td>
+                        <td className="py-3 tabular-nums">{assignment.year_no}</td>
+                        <td className="py-3 tabular-nums">
+                          {assignment.session_no ?? '—'}
                         </td>
                         <td className="py-3">
                           <SpanBadge span={assignment.span} />

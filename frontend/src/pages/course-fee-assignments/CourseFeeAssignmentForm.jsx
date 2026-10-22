@@ -41,6 +41,8 @@ export default function CourseFeeAssignmentForm() {
   const [curriculum, setCurriculum] = useState(null) // { id, name }
   const [feeStructure, setFeeStructure] = useState(null) // { id, name }
   const [span, setSpan] = useState('session')
+  const [yearNo, setYearNo] = useState('')
+  const [sessionNo, setSessionNo] = useState('')
   const [loading, setLoading] = useState(isEdit)
   const [loadError, setLoadError] = useState(null)
   const [errors, setErrors] = useState({})
@@ -80,6 +82,10 @@ export default function CourseFeeAssignmentForm() {
               : null,
           )
           setSpan(loaded.span ?? 'session')
+          setYearNo(loaded.year_no != null ? String(loaded.year_no) : '')
+          setSessionNo(
+            loaded.session_no != null ? String(loaded.session_no) : '',
+          )
         }
       })
       .catch((error) => {
@@ -115,6 +121,10 @@ export default function CourseFeeAssignmentForm() {
       curriculum_id: curriculum?.id ?? null,
       fee_structure_id: feeStructure?.id ?? null,
       span,
+      year_no: yearNo === '' ? null : Number(yearNo),
+      // A per-year fee spans its whole year, so it carries no session.
+      session_no:
+        span === 'session' && sessionNo !== '' ? Number(sessionNo) : null,
     }
 
     try {
@@ -180,10 +190,11 @@ export default function CourseFeeAssignmentForm() {
             {isEdit ? 'Edit Fee Assignment' : 'Assign Fee to Course'}
           </CardTitle>
           <CardDescription>
-            Choose the course + curriculum pair and the fee structure it
-            charges. The pair may charge under only one assignment, and the
-            span sets whether the structure&rsquo;s total repeats per session or
-            per year.
+            Choose the course + curriculum pair, the year of study (and
+            session, when charging per session), and the fee structure it
+            charges. Each slot may charge under only one assignment, and the
+            span sets whether the structure&rsquo;s total repeats per session
+            or per year.
           </CardDescription>
         </CardHeader>
 
@@ -318,6 +329,36 @@ export default function CourseFeeAssignmentForm() {
                   <option value="year">Per Year</option>
                 </Select>
               </FormField>
+
+              <FormField
+                id="year_no"
+                label="Year of Study"
+                name="year_no"
+                type="number"
+                required
+                min={1}
+                max={255}
+                value={yearNo}
+                onChange={(event) => setYearNo(event.target.value)}
+                placeholder="e.g. 1"
+                error={errors.year_no}
+              />
+
+              {span === 'session' && (
+                <FormField
+                  id="session_no"
+                  label="Session"
+                  name="session_no"
+                  type="number"
+                  required
+                  min={1}
+                  max={255}
+                  value={sessionNo}
+                  onChange={(event) => setSessionNo(event.target.value)}
+                  placeholder="e.g. 1"
+                  error={errors.session_no}
+                />
+              )}
             </div>
 
             <div className="flex items-center gap-3">

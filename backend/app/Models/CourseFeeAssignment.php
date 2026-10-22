@@ -12,8 +12,9 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
- * The fee a course + curriculum pair charges: one live assignment per
- * pair, pointing at the fee structure whose items add up to the charge
+ * The fee a course + curriculum pair charges in a given year of study
+ * (and session, when charging per session): one live assignment per
+ * slot, pointing at the fee structure whose items add up to the charge
  * and the span it repeats on. The pair is what an enrolment carries, so
  * invoicing locates a student's fee from their enrolment alone.
  */
@@ -32,6 +33,8 @@ class CourseFeeAssignment extends Model
         'curriculum_id',
         'fee_structure_id',
         'span',
+        'year_no',
+        'session_no',
         'created_by',
         'updated_by',
     ];
@@ -45,6 +48,8 @@ class CourseFeeAssignment extends Model
     {
         return [
             'span' => FeeSpan::class,
+            'year_no' => 'integer',
+            'session_no' => 'integer',
         ];
     }
 

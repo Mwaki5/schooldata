@@ -56,10 +56,17 @@ class CourseFeeAssignmentController extends Controller
             $query,
             searchable: [],
             sortable: [
+                'year' => 'year_no',
+                'session' => 'session_no',
                 'span' => 'span',
                 'created_at' => 'created_at',
             ],
-            defaultOrder: [['course_id', 'asc'], ['curriculum_id', 'asc']],
+            defaultOrder: [
+                ['course_id', 'asc'],
+                ['curriculum_id', 'asc'],
+                ['year_no', 'asc'],
+                ['session_no', 'asc'],
+            ],
         );
 
         $this->attachStructureTotals($paginator->items());

@@ -37,24 +37,30 @@ test('assignments are listed with their course, curriculum and fee structure', f
     $structure = FeeStructure::factory()->create(['name' => 'Year 1 Plan']);
 
     // Created out of order: the list is ordered by course, then
-    // curriculum, so course B (the earlier course) leads.
+    // curriculum, then year, so course B (the earlier course) leads.
     CourseFeeAssignment::factory()->create([
         'course_id' => $courseA->id,
         'curriculum_id' => $second->id,
         'fee_structure_id' => $structure->id,
         'span' => FeeSpan::Year,
+        'year_no' => 2,
+        'session_no' => null,
     ]);
     CourseFeeAssignment::factory()->create([
         'course_id' => $courseA->id,
         'curriculum_id' => $first->id,
         'fee_structure_id' => $structure->id,
         'span' => FeeSpan::Session,
+        'year_no' => 1,
+        'session_no' => 2,
     ]);
     CourseFeeAssignment::factory()->create([
         'course_id' => $courseB->id,
         'curriculum_id' => $first->id,
         'fee_structure_id' => $structure->id,
         'span' => FeeSpan::Session,
+        'year_no' => 1,
+        'session_no' => 1,
     ]);
 
     $this->withToken(courseFeeAssignmentsAccessTokenFor(User::factory()->create()))
@@ -62,7 +68,7 @@ test('assignments are listed with their course, curriculum and fee structure', f
         ->assertOk()
         ->assertJsonStructure([
             'course_fee_assignments' => [[
-                'id', 'course_id', 'curriculum_id', 'fee_structure_id', 'span',
+                'id', 'course_id', 'curriculum_id', 'fee_structure_id', 'span', 'year_no', 'session_no',
                 'course' => ['id', 'code', 'name'],
                 'curriculum' => ['id', 'name'],
                 'fee_structure' => ['id', 'name'],
@@ -72,8 +78,12 @@ test('assignments are listed with their course, curriculum and fee structure', f
         ->assertJsonCount(3, 'course_fee_assignments')
         ->assertJsonPath('course_fee_assignments.0.course.code', 'BBB200')
         ->assertJsonPath('course_fee_assignments.0.span', 'session')
+        ->assertJsonPath('course_fee_assignments.0.session_no', 1)
         ->assertJsonPath('course_fee_assignments.1.curriculum.name', 'Foundation Curriculum')
+        ->assertJsonPath('course_fee_assignments.1.session_no', 2)
         ->assertJsonPath('course_fee_assignments.2.curriculum.name', 'Advanced Curriculum')
+        ->assertJsonPath('course_fee_assignments.2.span', 'year')
+        ->assertJsonPath('course_fee_assignments.2.session_no', null)
         ->assertJsonPath('course_fee_assignments.2.fee_structure.name', 'Year 1 Plan');
 });
 
@@ -128,12 +138,16 @@ test('an assignment can be created with audit stamps', function () {
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => $structure->id,
             'span' => 'session',
+            'year_no' => 1,
+            'session_no' => 2,
         ])
         ->assertCreated()
         ->assertJsonPath('course_fee_assignment.course_id', $course->id)
         ->assertJsonPath('course_fee_assignment.curriculum_id', $curriculum->id)
         ->assertJsonPath('course_fee_assignment.fee_structure_id', $structure->id)
         ->assertJsonPath('course_fee_assignment.span', 'session')
+        ->assertJsonPath('course_fee_assignment.year_no', 1)
+        ->assertJsonPath('course_fee_assignment.session_no', 2)
         ->assertJsonPath('course_fee_assignment.course.id', $course->id)
         ->assertJsonPath('course_fee_assignment.curriculum.id', $curriculum->id)
         ->assertJsonPath('course_fee_assignment.fee_structure.id', $structure->id)
@@ -145,15 +159,58 @@ test('an assignment can be created with audit stamps', function () {
         'curriculum_id' => $curriculum->id,
         'fee_structure_id' => $structure->id,
         'span' => 'session',
+        'year_no' => 1,
+        'session_no' => 2,
         'created_by' => $creator->id,
     ]);
 });
 
-test('creating an assignment requires a course, curriculum, fee structure and span', function () {
+test('creating an assignment requires a course, curriculum, fee structure, span and year', function () {
     $this->withToken(courseFeeAssignmentsAccessTokenFor(User::factory()->create()))
         ->postJson('/api/course-fee-assignments', [])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['course_id', 'curriculum_id', 'fee_structure_id', 'span']);
+        ->assertJsonValidationErrors(['course_id', 'curriculum_id', 'fee_structure_id', 'span', 'year_no']);
+});
+
+test('a per-session assignment requires its session number', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+
+    $this->withToken(courseFeeAssignmentsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => FeeStructure::factory()->create()->id,
+            'span' => 'session',
+            'year_no' => 1,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['session_no']);
+});
+
+test('a per-year assignment drops any incoming session number', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+
+    $this->withToken(courseFeeAssignmentsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'year',
+            'year_no' => 2,
+            'session_no' => 1,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('course_fee_assignment.year_no', 2)
+        ->assertJsonPath('course_fee_assignment.session_no', null);
+
+    $this->assertDatabaseHas('course_fee_assignments', [
+        'course_id' => $course->id,
+        'year_no' => 2,
+        'session_no' => null,
+    ]);
 });
 
 test('the span must be per session or per year', function () {
@@ -166,6 +223,7 @@ test('the span must be per session or per year', function () {
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => FeeStructure::factory()->create()->id,
             'span' => 'monthly',
+            'year_no' => 1,
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['span']);
@@ -176,13 +234,18 @@ test('the referenced records must exist and be live', function () {
     $course = Course::factory()->create();
     $curriculum = Curriculum::factory()->create();
     $structure = FeeStructure::factory()->create();
+    $payload = [
+        'span' => 'session',
+        'year_no' => 1,
+        'session_no' => 1,
+    ];
 
     $this->withToken($token)
         ->postJson('/api/course-fee-assignments', [
             'course_id' => 9999,
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => $structure->id,
-            'span' => 'session',
+            ...$payload,
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['course_id']);
@@ -192,7 +255,7 @@ test('the referenced records must exist and be live', function () {
             'course_id' => $course->id,
             'curriculum_id' => 9999,
             'fee_structure_id' => $structure->id,
-            'span' => 'session',
+            ...$payload,
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['curriculum_id']);
@@ -202,7 +265,7 @@ test('the referenced records must exist and be live', function () {
             'course_id' => $course->id,
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => 9999,
-            'span' => 'session',
+            ...$payload,
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['fee_structure_id']);
@@ -215,17 +278,16 @@ test('the referenced records must exist and be live', function () {
             'course_id' => $course->id,
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => $structure->id,
-            'span' => 'session',
+            ...$payload,
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['fee_structure_id']);
 });
 
-test('a pair charges under only one live assignment', function () {
+test('a slot charges under only one live assignment', function () {
     $course = Course::factory()->create();
     $otherCourse = Course::factory()->create();
     $curriculum = Curriculum::factory()->create();
-    $otherCurriculum = Curriculum::factory()->create();
     $structure = FeeStructure::factory()->create();
     $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
 
@@ -234,32 +296,42 @@ test('a pair charges under only one live assignment', function () {
         'curriculum_id' => $curriculum->id,
         'fee_structure_id' => $structure->id,
         'span' => 'session',
+        'year_no' => 1,
+        'session_no' => 1,
     ];
 
     $this->withToken($token)
         ->postJson('/api/course-fee-assignments', $payload)
         ->assertCreated();
 
-    // The same pair again would make the enrolment lookup ambiguous.
+    // The same slot again would make the enrolment lookup ambiguous.
     $this->withToken($token)
         ->postJson('/api/course-fee-assignments', $payload)
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['course_id']);
+        ->assertJsonValidationErrors(['year_no']);
 
-    // The same course under another curriculum, and the same curriculum
-    // in another course, are different pairs.
+    // Another year, and another session of the same year, are new slots.
     $this->withToken($token)
-        ->postJson('/api/course-fee-assignments', [
-            ...$payload,
-            'curriculum_id' => $otherCurriculum->id,
-        ])
+        ->postJson('/api/course-fee-assignments', [...$payload, 'year_no' => 2])
         ->assertCreated();
 
     $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [...$payload, 'session_no' => 2])
+        ->assertCreated();
+
+    // A per-year fee covers its whole year, so it coexists with the
+    // session-specific fees of that year.
+    $this->withToken($token)
         ->postJson('/api/course-fee-assignments', [
             ...$payload,
-            'course_id' => $otherCourse->id,
+            'span' => 'year',
+            'session_no' => null,
         ])
+        ->assertCreated();
+
+    // The same slot in another course is a different charge.
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [...$payload, 'course_id' => $otherCourse->id])
         ->assertCreated();
 });
 
@@ -275,19 +347,25 @@ test('an assignment can be corrected, stamped with the updating user', function 
         'curriculum_id' => $curriculum->id,
         'fee_structure_id' => $oldStructure->id,
         'span' => FeeSpan::Session,
+        'year_no' => 1,
+        'session_no' => 1,
         'created_by' => $creator->id,
     ]);
 
+    // Switching the span to per year clears the session pin.
     $this->withToken(courseFeeAssignmentsAccessTokenFor($updater))
         ->putJson('/api/course-fee-assignments/'.$assignment->id, [
             'course_id' => $course->id,
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => $newStructure->id,
             'span' => 'year',
+            'year_no' => 1,
+            'session_no' => 1,
         ])
         ->assertOk()
         ->assertJsonPath('course_fee_assignment.fee_structure_id', $newStructure->id)
         ->assertJsonPath('course_fee_assignment.span', 'year')
+        ->assertJsonPath('course_fee_assignment.session_no', null)
         ->assertJsonPath('course_fee_assignment.created_by', $creator->id)
         ->assertJsonPath('course_fee_assignment.updated_by', $updater->id);
 
@@ -295,47 +373,57 @@ test('an assignment can be corrected, stamped with the updating user', function 
         'id' => $assignment->id,
         'fee_structure_id' => $newStructure->id,
         'span' => 'year',
+        'session_no' => null,
         'updated_by' => $updater->id,
     ]);
 });
 
-test('updating an assignment validates its pair excluding itself', function () {
+test('updating an assignment validates its slot excluding itself', function () {
     $course = Course::factory()->create();
     $curriculum = Curriculum::factory()->create();
-    $takenCurriculum = Curriculum::factory()->create();
     $assignment = CourseFeeAssignment::factory()->create([
         'course_id' => $course->id,
         'curriculum_id' => $curriculum->id,
+        'span' => FeeSpan::Session,
+        'year_no' => 1,
+        'session_no' => 1,
     ]);
     CourseFeeAssignment::factory()->create([
         'course_id' => $course->id,
-        'curriculum_id' => $takenCurriculum->id,
+        'curriculum_id' => $curriculum->id,
+        'span' => FeeSpan::Session,
+        'year_no' => 1,
+        'session_no' => 2,
     ]);
     $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
 
-    // Keeping its own pair is not a duplicate of itself.
+    // Keeping its own slot is not a duplicate of itself.
     $this->withToken($token)
         ->putJson('/api/course-fee-assignments/'.$assignment->id, [
             'course_id' => $course->id,
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => $assignment->fee_structure_id,
-            'span' => 'year',
+            'span' => 'session',
+            'year_no' => 1,
+            'session_no' => 1,
         ])
         ->assertOk();
 
-    // Moving onto a pair that already charges is refused.
+    // Moving onto a slot that already charges is refused.
     $this->withToken($token)
         ->putJson('/api/course-fee-assignments/'.$assignment->id, [
             'course_id' => $course->id,
-            'curriculum_id' => $takenCurriculum->id,
+            'curriculum_id' => $curriculum->id,
             'fee_structure_id' => $assignment->fee_structure_id,
-            'span' => 'year',
+            'span' => 'session',
+            'year_no' => 1,
+            'session_no' => 2,
         ])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['course_id']);
+        ->assertJsonValidationErrors(['year_no']);
 });
 
-test('an assignment is soft deleted and its pair becomes reusable', function () {
+test('an assignment is soft deleted and its slot becomes reusable', function () {
     $course = Course::factory()->create();
     $curriculum = Curriculum::factory()->create();
     $structure = FeeStructure::factory()->create();
@@ -344,6 +432,9 @@ test('an assignment is soft deleted and its pair becomes reusable', function () 
         'course_id' => $course->id,
         'curriculum_id' => $curriculum->id,
         'fee_structure_id' => $structure->id,
+        'span' => FeeSpan::Session,
+        'year_no' => 1,
+        'session_no' => 1,
     ]);
 
     $this->withToken($token)
@@ -363,6 +454,7 @@ test('an assignment is soft deleted and its pair becomes reusable', function () 
             'curriculum_id' => $curriculum->id,
             'fee_structure_id' => $structure->id,
             'span' => 'year',
+            'year_no' => 1,
         ])
         ->assertCreated();
 });
