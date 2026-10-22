@@ -82,6 +82,7 @@ function unitGradesAward(array $setup, CourseUnit $courseUnit, UnitExamType $typ
 test('the unit grade endpoints require an access token', function () {
     $this->getJson('/api/unit-grades/units')->assertUnauthorized();
     $this->getJson('/api/unit-grades/students?course_unit_id=1')->assertUnauthorized();
+    $this->getJson('/api/unit-grades/sheet?course_unit_id=1')->assertUnauthorized();
     $this->getJson('/api/unit-grades?student_id=1')->assertUnauthorized();
     $this->putJson('/api/unit-grades', [])->assertUnauthorized();
 });
@@ -91,6 +92,7 @@ test('the unit grade endpoints refuse students and finance', function (Role $rol
 
     $this->withToken($token)->getJson('/api/unit-grades/units')->assertForbidden();
     $this->withToken($token)->getJson('/api/unit-grades/students?course_unit_id=1')->assertForbidden();
+    $this->withToken($token)->getJson('/api/unit-grades/sheet?course_unit_id=1')->assertForbidden();
     $this->withToken($token)->getJson('/api/unit-grades?student_id=1')->assertForbidden();
     $this->withToken($token)->putJson('/api/unit-grades', [])->assertForbidden();
 })->with([
@@ -267,6 +269,89 @@ test('the student picker narrows by name or admission number', function () {
         ->getJson($baseUrl.'&search=no-such-student')
         ->assertOk()
         ->assertJsonCount(0, 'students');
+});
+
+test('the marks sheet lists registered students with papers and averages', function () {
+    $setup = unitGradesRegisteredStudent();
+
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Theory, 1, 58);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Theory, 2, 66);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Theory, 3, 72.5);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Practical, 1, 80);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Practical, 2, 74);
+
+    // A classmate registered alongside, with a single theory paper.
+    $mate = StudentProfile::factory()->create();
+    UnitRegistration::factory()->create([
+        'academic_session_id' => $setup['session']->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'student_id' => $mate->id,
+    ]);
+    UnitGrade::factory()->create([
+        'academic_session_id' => $setup['session']->id,
+        'student_id' => $mate->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'exam_type' => UnitExamType::Theory,
+        'exam_no' => 1,
+        'mark' => 90,
+    ]);
+
+    $this->withToken($setup['token'])
+        ->getJson("/api/unit-grades/sheet?academic_session_id={$setup['session']->id}&course_unit_id={$setup['courseUnit']->id}")
+        ->assertOk()
+        ->assertJsonPath('session.id', $setup['session']->id)
+        ->assertJsonPath('unit.code', 'U100')
+        ->assertJsonCount(2, 'rows')
+        ->assertJsonPath('rows.0.admission_no', 'ADM-2026-099')
+        ->assertJsonPath('rows.0.theory.0', 58)
+        ->assertJsonPath('rows.0.theory.1', 66)
+        ->assertJsonPath('rows.0.theory.2', 72.5)
+        ->assertJsonPath('rows.0.theory_average', 65.5)
+        ->assertJsonPath('rows.0.practical.0', 80)
+        ->assertJsonPath('rows.0.practical.1', 74)
+        ->assertJsonPath('rows.0.practical.2', null)
+        ->assertJsonPath('rows.0.practical_average', 77)
+        ->assertJsonPath('rows.1.name', User::composeName($mate->first_name, $mate->middle_name, $mate->last_name))
+        ->assertJsonPath('rows.1.theory.0', 90)
+        ->assertJsonPath('rows.1.theory_average', 90)
+        ->assertJsonPath('rows.1.practical_average', null);
+
+    // Without an explicit session the sheet falls back to the active one.
+    $this->withToken($setup['token'])
+        ->getJson("/api/unit-grades/sheet?course_unit_id={$setup['courseUnit']->id}")
+        ->assertOk()
+        ->assertJsonCount(2, 'rows');
+});
+
+test('the marks sheet only lists students registered for the session', function () {
+    $setup = unitGradesRegisteredStudent();
+
+    // Registered under another session only: the database would refuse
+    // marks for them here anyway (the composite foreign key).
+    $other = StudentProfile::factory()->create();
+    UnitRegistration::factory()->create([
+        'academic_session_id' => AcademicSession::factory()->create([
+            'academic_year_id' => $setup['session']->academic_year_id,
+            'is_active' => false,
+        ]),
+        'course_unit_id' => $setup['courseUnit']->id,
+        'student_id' => $other->id,
+    ]);
+
+    $this->withToken($setup['token'])
+        ->getJson("/api/unit-grades/sheet?academic_session_id={$setup['session']->id}&course_unit_id={$setup['courseUnit']->id}")
+        ->assertOk()
+        ->assertJsonCount(1, 'rows')
+        ->assertJsonPath('rows.0.student_id', $setup['profile']->id);
+});
+
+test('the marks sheet requires a course unit', function () {
+    $setup = unitGradesRegisteredStudent();
+
+    $this->withToken($setup['token'])
+        ->getJson('/api/unit-grades/sheet')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['course_unit_id']);
 });
 
 test('a trainer can award marks with audit stamps', function () {

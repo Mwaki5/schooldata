@@ -47,6 +47,7 @@ const Profile = lazy(() => import('@/pages/profile/Profile'))
 const MyUnits = lazy(() => import('@/pages/my-units/MyUnits'))
 const OpenSession = lazy(() => import('@/pages/session-offerings/OpenSession'))
 const UnitGrades = lazy(() => import('@/pages/unit-grades/UnitGrades'))
+const Marksheet = lazy(() => import('@/pages/marksheet/Marksheet'))
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -246,6 +247,7 @@ export default function App() {
             }
           >
             <Route path="/unit-grades" element={<UnitGrades />} />
+            <Route path="/marksheet" element={<Marksheet />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

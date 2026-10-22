@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\UnitGrades;
 
+use App\Enums\UnitExamType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UnitGrades\SaveUnitGradesRequest;
 use App\Models\AcademicSession;
@@ -109,6 +110,80 @@ class UnitGradeController extends Controller
             ->values();
 
         return response()->json(['students' => $students]);
+    }
+
+    /**
+     * The marks sheet for one session and course unit: every student who
+     * registered it with their theory and practical papers laid out per
+     * exam slot, plus each type's average. Unmarked slots stay null so
+     * the sheet shows what is still missing at a glance.
+     */
+    public function sheet(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'academic_session_id' => ['sometimes', 'integer', 'exists:academic_sessions,id'],
+            'course_unit_id' => ['required', 'integer', 'exists:course_units,id'],
+        ]);
+
+        $session = $this->resolveSession($data);
+
+        if ($session === null) {
+            return response()->json(['session' => null, 'unit' => null, 'rows' => []]);
+        }
+
+        $courseUnit = CourseUnit::query()
+            ->with('unit:id,code,name')
+            ->findOrFail($data['course_unit_id']);
+
+        $registrations = UnitRegistration::query()
+            ->where('academic_session_id', $session->id)
+            ->where('course_unit_id', $courseUnit->id)
+            ->with('student.user:id,login_id')
+            ->orderBy('id')
+            ->get();
+
+        $grades = UnitGrade::query()
+            ->where('academic_session_id', $session->id)
+            ->where('course_unit_id', $courseUnit->id)
+            ->get(['student_id', 'exam_type', 'exam_no', 'mark'])
+            ->groupBy('student_id');
+
+        $rows = $registrations->map(function (UnitRegistration $registration) use ($grades): array {
+            $theory = [null, null, null];
+            $practical = [null, null, null];
+
+            foreach ($grades->get($registration->student_id, collect()) as $grade) {
+                $index = $grade->exam_no - 1;
+
+                if ($grade->exam_type === UnitExamType::Theory) {
+                    $theory[$index] = (float) $grade->mark;
+                } else {
+                    $practical[$index] = (float) $grade->mark;
+                }
+            }
+
+            $student = $this->studentPayload($registration->student);
+
+            return [
+                'student_id' => $registration->student_id,
+                'admission_no' => $student['admission_no'] ?? null,
+                'name' => $student['name'] ?? null,
+                'theory' => $theory,
+                'theory_average' => $this->slotAverage($theory),
+                'practical' => $practical,
+                'practical_average' => $this->slotAverage($practical),
+            ];
+        })->values();
+
+        return response()->json([
+            'session' => $this->sessionPayload($session),
+            'unit' => [
+                'course_unit_id' => $courseUnit->id,
+                'code' => $courseUnit->unit?->code,
+                'name' => $courseUnit->unit?->name,
+            ],
+            'rows' => $rows,
+        ]);
     }
 
     /**
@@ -251,6 +326,19 @@ class UnitGradeController extends Controller
             'name' => $session->name,
             'is_active' => $session->is_active,
         ];
+    }
+
+    /**
+     * The average across the recorded slots of one paper type, or null
+     * when none have been marked yet.
+     *
+     * @param  array<int, float|null>  $slots
+     */
+    private function slotAverage(array $slots): ?float
+    {
+        $recorded = array_filter($slots, fn (?float $mark): bool => $mark !== null);
+
+        return count($recorded) === 0 ? null : round(array_sum($recorded) / count($recorded), 2);
     }
 
     /**

@@ -80,6 +80,7 @@ const NAV_ITEMS = [
     roles: ['admin', 'trainer'],
     children: [
       { label: 'Unit Grading', to: '/unit-grades', roles: ['admin', 'trainer'] },
+      { label: 'Marksheet', to: '/marksheet', roles: ['admin', 'trainer'] },
     ],
   },
   { label: 'Fees', icon: Wallet, disabled: true },
@@ -103,6 +104,7 @@ const PAGE_TITLES = {
   '/session-offerings': 'Open Session',
   '/term-events': 'Term Events',
   '/unit-grades': 'Unit Grading',
+  '/marksheet': 'Marksheet',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',
