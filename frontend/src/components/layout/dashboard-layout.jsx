@@ -85,7 +85,14 @@ const NAV_ITEMS = [
       { label: 'Grades', to: '/graded', roles: ['student'] },
     ],
   },
-  { label: 'Fees', icon: Wallet, disabled: true },
+  {
+    label: 'Fees',
+    icon: Wallet,
+    roles: ['admin'],
+    children: [
+      { label: 'Fee Structure', to: '/fee-structures', roles: ['admin'] },
+    ],
+  },
 ]
 
 const PAGE_TITLES = {
@@ -108,6 +115,7 @@ const PAGE_TITLES = {
   '/term-events': 'Term Events',
   '/unit-grades': 'Unit Grading',
   '/marksheet': 'Marksheet',
+  '/fee-structures': 'Fee Structures',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',

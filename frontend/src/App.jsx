@@ -19,6 +19,8 @@ const ExamBodies = lazy(() => import('@/pages/exam-bodies/ExamBodies'))
 const ExamBodyForm = lazy(() => import('@/pages/exam-bodies/ExamBodyForm'))
 const ExamBodyGrades = lazy(() => import('@/pages/exam-body-grades/ExamBodyGrades'))
 const ExamBodyGradeForm = lazy(() => import('@/pages/exam-body-grades/ExamBodyGradeForm'))
+const FeeStructures = lazy(() => import('@/pages/fee-structures/FeeStructures'))
+const FeeStructureForm = lazy(() => import('@/pages/fee-structures/FeeStructureForm'))
 const CertificationLevels = lazy(() => import('@/pages/certification-levels/CertificationLevels'))
 const CertificationLevelForm = lazy(() => import('@/pages/certification-levels/CertificationLevelForm'))
 const Curricula = lazy(() => import('@/pages/curricula/Curricula'))
@@ -175,6 +177,12 @@ export default function App() {
             <Route
               path="/exam-body-grades/:gradeId/edit"
               element={<ExamBodyGradeForm />}
+            />
+            <Route path="/fee-structures" element={<FeeStructures />} />
+            <Route path="/fee-structures/create" element={<FeeStructureForm />} />
+            <Route
+              path="/fee-structures/:feeStructureId/edit"
+              element={<FeeStructureForm />}
             />
             <Route path="/certification-levels" element={<CertificationLevels />} />
             <Route path="/certification-levels/create" element={<CertificationLevelForm />} />

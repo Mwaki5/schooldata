@@ -14,6 +14,7 @@ use App\Http\Controllers\Departments\DepartmentController;
 use App\Http\Controllers\Enrolments\EnrolmentController;
 use App\Http\Controllers\ExamBodies\ExamBodyController;
 use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
+use App\Http\Controllers\FeeStructures\FeeStructureController;
 use App\Http\Controllers\Me\DashboardController;
 use App\Http\Controllers\Me\MyGradesController;
 use App\Http\Controllers\Me\MyUnitsController;
@@ -237,6 +238,30 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('certification-levels.destroy');
+
+    // Fee structures: the named fee plans the school charges against.
+    // The Fees module's first building block, so it is admin-managed
+    // master data like the other academic pillars.
+    Route::get('fee-structures', [FeeStructureController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.index');
+    Route::post('fee-structures', [FeeStructureController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.store');
+    Route::get('fee-structures/{feeStructure}', [FeeStructureController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.show');
+    Route::match(['PUT', 'PATCH'], 'fee-structures/{feeStructure}', [FeeStructureController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.update');
+    Route::delete('fee-structures/{feeStructure}', [FeeStructureController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.destroy');
 
     Route::get('curricula', [CurriculumController::class, 'index'])
         ->middleware('role:admin')
