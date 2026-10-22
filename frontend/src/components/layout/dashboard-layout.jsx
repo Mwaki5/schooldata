@@ -60,7 +60,6 @@ const NAV_ITEMS = [
       // Students only ever see their own course's units, never the
       // admin catalogue.
       { label: 'My Units', to: '/my-units', roles: ['student'] },
-      { label: 'Grades', to: '/graded', roles: ['student'] },
     ],
   },
   {
@@ -78,10 +77,12 @@ const NAV_ITEMS = [
   {
     label: 'Exams & Grades',
     icon: ClipboardList,
-    roles: ['admin', 'trainer'],
+    roles: ['admin', 'trainer', 'student'],
     children: [
       { label: 'Unit Grading', to: '/unit-grades', roles: ['admin', 'trainer'] },
       { label: 'Marksheet', to: '/marksheet', roles: ['admin', 'trainer'] },
+      // The student's own marksheet: their registered units and marks.
+      { label: 'Grades', to: '/graded', roles: ['student'] },
     ],
   },
   { label: 'Fees', icon: Wallet, disabled: true },
