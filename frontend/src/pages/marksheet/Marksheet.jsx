@@ -185,7 +185,7 @@ export default function Marksheet() {
                       </th>
                       <th
                         scope="col"
-                        className="whitespace-nowrap bg-red-100 px-3 py-2 text-center font-semibold text-red-700 dark:bg-red-950/50 dark:text-red-400"
+                        className="whitespace-nowrap px-3 py-2 text-center font-semibold text-red-600 dark:text-red-400"
                       >
                         AVERAGE
                       </th>
@@ -200,7 +200,7 @@ export default function Marksheet() {
                       </th>
                       <th
                         scope="col"
-                        className="whitespace-nowrap bg-red-100 px-3 py-2 text-center font-semibold text-red-700 dark:bg-red-950/50 dark:text-red-400"
+                        className="whitespace-nowrap px-3 py-2 text-center font-semibold text-red-600 dark:text-red-400"
                       >
                         AVERAGE
                       </th>
@@ -224,7 +224,7 @@ export default function Marksheet() {
                             {mark ?? '—'}
                           </td>
                         ))}
-                        <td className="whitespace-nowrap bg-red-100 px-3 py-2 text-center font-semibold tabular-nums text-red-700 dark:bg-red-950/50 dark:text-red-400">
+                        <td className="whitespace-nowrap px-3 py-2 text-center font-semibold tabular-nums text-red-600 dark:text-red-400">
                           {row.theory_average ?? '—'}
                         </td>
                         {row.practical.map((mark, slot) => (
@@ -237,7 +237,7 @@ export default function Marksheet() {
                             {mark ?? '—'}
                           </td>
                         ))}
-                        <td className="whitespace-nowrap bg-red-100 px-3 py-2 text-center font-semibold tabular-nums text-red-700 dark:bg-red-950/50 dark:text-red-400">
+                        <td className="whitespace-nowrap px-3 py-2 text-center font-semibold tabular-nums text-red-600 dark:text-red-400">
                           {row.practical_average ?? '—'}
                         </td>
                       </tr>
