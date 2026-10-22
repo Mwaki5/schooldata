@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordUpdateController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CertificationLevels\CertificationLevelController;
+use App\Http\Controllers\CourseFeeAssignments\CourseFeeAssignmentController;
 use App\Http\Controllers\Courses\CourseController;
 use App\Http\Controllers\CourseUnits\CourseUnitController;
 use App\Http\Controllers\Curriculums\CurriculumController;
@@ -283,6 +284,31 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('fee-structures.items.destroy');
+
+    // Course fee assignments: which fee structure a course + curriculum
+    // pair charges, and over what span. The pair is what an enrolment
+    // carries, so a student's fee is later located from their enrolment
+    // alone — one live assignment per pair.
+    Route::get('course-fee-assignments', [CourseFeeAssignmentController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-fee-assignments.index');
+    Route::post('course-fee-assignments', [CourseFeeAssignmentController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-fee-assignments.store');
+    Route::get('course-fee-assignments/{courseFeeAssignment}', [CourseFeeAssignmentController::class, 'show'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-fee-assignments.show');
+    Route::match(['PUT', 'PATCH'], 'course-fee-assignments/{courseFeeAssignment}', [CourseFeeAssignmentController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-fee-assignments.update');
+    Route::delete('course-fee-assignments/{courseFeeAssignment}', [CourseFeeAssignmentController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('course-fee-assignments.destroy');
 
     Route::get('curricula', [CurriculumController::class, 'index'])
         ->middleware('role:admin')

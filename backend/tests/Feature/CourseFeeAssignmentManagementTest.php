@@ -1,0 +1,408 @@
+<?php
+
+use App\Enums\FeeSpan;
+use App\Enums\Role;
+use App\Models\Course;
+use App\Models\CourseFeeAssignment;
+use App\Models\Curriculum;
+use App\Models\FeeStructure;
+use App\Models\FeeStructureItem;
+use App\Models\User;
+use Tymon\JWTAuth\Facades\JWTAuth;
+
+function courseFeeAssignmentsAccessTokenFor(User $user): string
+{
+    JWTAuth::factory()->setTTL((int) config('jwt.ttl'));
+
+    return JWTAuth::claims(['type' => 'access'])->fromUser($user);
+}
+
+test('course fee assignment endpoints require an access token', function () {
+    $this->getJson('/api/course-fee-assignments')->assertUnauthorized();
+    $this->postJson('/api/course-fee-assignments', [])->assertUnauthorized();
+});
+
+test('only admins manage course fee assignments', function () {
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create(['role' => Role::Trainer]));
+
+    $this->withToken($token)->getJson('/api/course-fee-assignments')->assertForbidden();
+    $this->withToken($token)->postJson('/api/course-fee-assignments', [])->assertForbidden();
+});
+
+test('assignments are listed with their course, curriculum and fee structure', function () {
+    $courseB = Course::factory()->create(['code' => 'BBB200', 'name' => 'Plumbing']);
+    $courseA = Course::factory()->create(['code' => 'AAA100', 'name' => 'ICT']);
+    $first = Curriculum::factory()->create(['name' => 'Foundation Curriculum']);
+    $second = Curriculum::factory()->create(['name' => 'Advanced Curriculum']);
+    $structure = FeeStructure::factory()->create(['name' => 'Year 1 Plan']);
+
+    // Created out of order: the list is ordered by course, then
+    // curriculum, so course B (the earlier course) leads.
+    CourseFeeAssignment::factory()->create([
+        'course_id' => $courseA->id,
+        'curriculum_id' => $second->id,
+        'fee_structure_id' => $structure->id,
+        'span' => FeeSpan::Year,
+    ]);
+    CourseFeeAssignment::factory()->create([
+        'course_id' => $courseA->id,
+        'curriculum_id' => $first->id,
+        'fee_structure_id' => $structure->id,
+        'span' => FeeSpan::Session,
+    ]);
+    CourseFeeAssignment::factory()->create([
+        'course_id' => $courseB->id,
+        'curriculum_id' => $first->id,
+        'fee_structure_id' => $structure->id,
+        'span' => FeeSpan::Session,
+    ]);
+
+    $this->withToken(courseFeeAssignmentsAccessTokenFor(User::factory()->create()))
+        ->getJson('/api/course-fee-assignments')
+        ->assertOk()
+        ->assertJsonStructure([
+            'course_fee_assignments' => [[
+                'id', 'course_id', 'curriculum_id', 'fee_structure_id', 'span',
+                'course' => ['id', 'code', 'name'],
+                'curriculum' => ['id', 'name'],
+                'fee_structure' => ['id', 'name'],
+            ]],
+            'meta',
+        ])
+        ->assertJsonCount(3, 'course_fee_assignments')
+        ->assertJsonPath('course_fee_assignments.0.course.code', 'BBB200')
+        ->assertJsonPath('course_fee_assignments.0.span', 'session')
+        ->assertJsonPath('course_fee_assignments.1.curriculum.name', 'Foundation Curriculum')
+        ->assertJsonPath('course_fee_assignments.2.curriculum.name', 'Advanced Curriculum')
+        ->assertJsonPath('course_fee_assignments.2.fee_structure.name', 'Year 1 Plan');
+});
+
+test('the search narrows by course, curriculum or fee structure', function () {
+    $ict = Course::factory()->create(['code' => 'ICT101', 'name' => 'Information Technology']);
+    $cosmetology = Course::factory()->create(['code' => 'COS101', 'name' => 'Cosmetology']);
+    $curriculum = Curriculum::factory()->create(['name' => 'KNEC 2025 Curriculum']);
+    $otherCurriculum = Curriculum::factory()->create(['name' => 'NITA 2024 Curriculum']);
+    $structure = FeeStructure::factory()->create(['name' => 'ICT Plan']);
+
+    CourseFeeAssignment::factory()->create([
+        'course_id' => $ict->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $structure->id,
+    ]);
+    CourseFeeAssignment::factory()->create([
+        'course_id' => $cosmetology->id,
+        'curriculum_id' => $otherCurriculum->id,
+        'fee_structure_id' => FeeStructure::factory()->create(['name' => 'Salon Plan']),
+    ]);
+
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/course-fee-assignments?search=ICT101')
+        ->assertOk()
+        ->assertJsonCount(1, 'course_fee_assignments')
+        ->assertJsonPath('course_fee_assignments.0.course.code', 'ICT101');
+
+    $this->withToken($token)
+        ->getJson('/api/course-fee-assignments?search='.urlencode('NITA 2024'))
+        ->assertOk()
+        ->assertJsonCount(1, 'course_fee_assignments')
+        ->assertJsonPath('course_fee_assignments.0.course.code', 'COS101');
+
+    $this->withToken($token)
+        ->getJson('/api/course-fee-assignments?search='.urlencode('Salon Plan'))
+        ->assertOk()
+        ->assertJsonCount(1, 'course_fee_assignments')
+        ->assertJsonPath('course_fee_assignments.0.fee_structure.name', 'Salon Plan');
+});
+
+test('an assignment can be created with audit stamps', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+    $creator = User::factory()->create();
+
+    $this->withToken(courseFeeAssignmentsAccessTokenFor($creator))
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'session',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('course_fee_assignment.course_id', $course->id)
+        ->assertJsonPath('course_fee_assignment.curriculum_id', $curriculum->id)
+        ->assertJsonPath('course_fee_assignment.fee_structure_id', $structure->id)
+        ->assertJsonPath('course_fee_assignment.span', 'session')
+        ->assertJsonPath('course_fee_assignment.course.id', $course->id)
+        ->assertJsonPath('course_fee_assignment.curriculum.id', $curriculum->id)
+        ->assertJsonPath('course_fee_assignment.fee_structure.id', $structure->id)
+        ->assertJsonPath('course_fee_assignment.created_by', $creator->id)
+        ->assertJsonPath('course_fee_assignment.updated_by', $creator->id);
+
+    $this->assertDatabaseHas('course_fee_assignments', [
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $structure->id,
+        'span' => 'session',
+        'created_by' => $creator->id,
+    ]);
+});
+
+test('creating an assignment requires a course, curriculum, fee structure and span', function () {
+    $this->withToken(courseFeeAssignmentsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/course-fee-assignments', [])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['course_id', 'curriculum_id', 'fee_structure_id', 'span']);
+});
+
+test('the span must be per session or per year', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+
+    $this->withToken(courseFeeAssignmentsAccessTokenFor(User::factory()->create()))
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => FeeStructure::factory()->create()->id,
+            'span' => 'monthly',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['span']);
+});
+
+test('the referenced records must exist and be live', function () {
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => 9999,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'session',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['course_id']);
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => 9999,
+            'fee_structure_id' => $structure->id,
+            'span' => 'session',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['curriculum_id']);
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => 9999,
+            'span' => 'session',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['fee_structure_id']);
+
+    // A soft-deleted fee structure is no longer assignable.
+    $structure->delete();
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'session',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['fee_structure_id']);
+});
+
+test('a pair charges under only one live assignment', function () {
+    $course = Course::factory()->create();
+    $otherCourse = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $otherCurriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    $payload = [
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $structure->id,
+        'span' => 'session',
+    ];
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', $payload)
+        ->assertCreated();
+
+    // The same pair again would make the enrolment lookup ambiguous.
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['course_id']);
+
+    // The same course under another curriculum, and the same curriculum
+    // in another course, are different pairs.
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            ...$payload,
+            'curriculum_id' => $otherCurriculum->id,
+        ])
+        ->assertCreated();
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            ...$payload,
+            'course_id' => $otherCourse->id,
+        ])
+        ->assertCreated();
+});
+
+test('an assignment can be corrected, stamped with the updating user', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $oldStructure = FeeStructure::factory()->create();
+    $newStructure = FeeStructure::factory()->create();
+    $creator = User::factory()->create();
+    $updater = User::factory()->create();
+    $assignment = CourseFeeAssignment::factory()->create([
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $oldStructure->id,
+        'span' => FeeSpan::Session,
+        'created_by' => $creator->id,
+    ]);
+
+    $this->withToken(courseFeeAssignmentsAccessTokenFor($updater))
+        ->putJson('/api/course-fee-assignments/'.$assignment->id, [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $newStructure->id,
+            'span' => 'year',
+        ])
+        ->assertOk()
+        ->assertJsonPath('course_fee_assignment.fee_structure_id', $newStructure->id)
+        ->assertJsonPath('course_fee_assignment.span', 'year')
+        ->assertJsonPath('course_fee_assignment.created_by', $creator->id)
+        ->assertJsonPath('course_fee_assignment.updated_by', $updater->id);
+
+    $this->assertDatabaseHas('course_fee_assignments', [
+        'id' => $assignment->id,
+        'fee_structure_id' => $newStructure->id,
+        'span' => 'year',
+        'updated_by' => $updater->id,
+    ]);
+});
+
+test('updating an assignment validates its pair excluding itself', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $takenCurriculum = Curriculum::factory()->create();
+    $assignment = CourseFeeAssignment::factory()->create([
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+    ]);
+    CourseFeeAssignment::factory()->create([
+        'course_id' => $course->id,
+        'curriculum_id' => $takenCurriculum->id,
+    ]);
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    // Keeping its own pair is not a duplicate of itself.
+    $this->withToken($token)
+        ->putJson('/api/course-fee-assignments/'.$assignment->id, [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $assignment->fee_structure_id,
+            'span' => 'year',
+        ])
+        ->assertOk();
+
+    // Moving onto a pair that already charges is refused.
+    $this->withToken($token)
+        ->putJson('/api/course-fee-assignments/'.$assignment->id, [
+            'course_id' => $course->id,
+            'curriculum_id' => $takenCurriculum->id,
+            'fee_structure_id' => $assignment->fee_structure_id,
+            'span' => 'year',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['course_id']);
+});
+
+test('an assignment is soft deleted and its pair becomes reusable', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+    $assignment = CourseFeeAssignment::factory()->create([
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $structure->id,
+    ]);
+
+    $this->withToken($token)
+        ->deleteJson('/api/course-fee-assignments/'.$assignment->id)
+        ->assertNoContent();
+
+    $this->assertSoftDeleted('course_fee_assignments', ['id' => $assignment->id]);
+
+    $this->withToken($token)
+        ->getJson('/api/course-fee-assignments')
+        ->assertOk()
+        ->assertJsonCount(0, 'course_fee_assignments');
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'year',
+        ])
+        ->assertCreated();
+});
+
+test('assignment payloads carry the summed fee amount of their structure', function () {
+    $structure = FeeStructure::factory()->create();
+    FeeStructureItem::factory()->create([
+        'fee_structure_id' => $structure->id,
+        'name' => 'Tuition',
+        'amount' => 45000,
+    ]);
+    FeeStructureItem::factory()->create([
+        'fee_structure_id' => $structure->id,
+        'name' => 'Examination Fees',
+        'amount' => 5000,
+    ]);
+    $assignment = CourseFeeAssignment::factory()->create([
+        'fee_structure_id' => $structure->id,
+    ]);
+    $emptyStructure = FeeStructure::factory()->create();
+    CourseFeeAssignment::factory()->create([
+        'fee_structure_id' => $emptyStructure->id,
+    ]);
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/course-fee-assignments')
+        ->assertOk()
+        ->assertJsonPath('course_fee_assignments.0.fee_structure.total', 50000)
+        ->assertJsonPath('course_fee_assignments.1.fee_structure.total', 0);
+
+    $this->withToken($token)
+        ->getJson('/api/course-fee-assignments/'.$assignment->id)
+        ->assertOk()
+        ->assertJsonPath('course_fee_assignment.fee_structure.total', 50000);
+});
+
+test('a missing assignment returns 404', function () {
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)->getJson('/api/course-fee-assignments/9999')->assertNotFound();
+    $this->withToken($token)->deleteJson('/api/course-fee-assignments/9999')->assertNotFound();
+});

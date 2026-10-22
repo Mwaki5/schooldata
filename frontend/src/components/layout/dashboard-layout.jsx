@@ -91,6 +91,7 @@ const NAV_ITEMS = [
     roles: ['admin'],
     children: [
       { label: 'Fee Structure', to: '/fee-structures', roles: ['admin'] },
+      { label: 'Course Fees', to: '/course-fee-assignments', roles: ['admin'] },
     ],
   },
 ]
@@ -117,6 +118,7 @@ const PAGE_TITLES = {
   '/marksheet': 'Marksheet',
   '/fee-structures': 'Fee Structures',
   '/fee-structures/:feeStructureId/items': 'Fee Structure Items',
+  '/course-fee-assignments': 'Course Fee Assignments',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',
