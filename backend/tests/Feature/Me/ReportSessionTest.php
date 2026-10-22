@@ -2,7 +2,6 @@
 
 use App\Enums\EnrolmentStatus;
 use App\Enums\OfferingStatus;
-use App\Enums\Role;
 use App\Enums\TermEventName;
 use App\Models\AcademicSession;
 use App\Models\AcademicSessionRegistration;
@@ -63,7 +62,7 @@ function reportSessionStage(Course $course): CourseStage
  */
 function reportSessionStudent(AcademicSession $session, Course $course, CourseStage $stage): array
 {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $profile = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     CourseEnrolment::factory()->create([
@@ -104,18 +103,18 @@ test('reporting for a session requires an access token', function () {
     $this->postJson('/api/me/report-session')->assertUnauthorized();
 });
 
-test('reporting for a session refuses non-student tokens', function (Role $role) {
-    $token = reportSessionAccessTokenFor(User::factory()->create(['role' => $role]));
+test('reporting for a session refuses non-student tokens', function (string $role) {
+    $token = reportSessionAccessTokenFor(User::factory()->{$role}()->create());
 
     $this->withToken($token)->postJson('/api/me/report-session')->assertForbidden();
 })->with([
-    'admin' => Role::Admin,
-    'trainer' => Role::Trainer,
-    'finance' => Role::Finance,
+    'admin' => 'admin',
+    'trainer' => 'trainer',
+    'finance' => 'finance',
 ]);
 
 test('reporting fails when there is no active academic session', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     StudentProfile::factory()->create(['user_id' => $user->id]);
 
     $this->withToken(reportSessionAccessTokenFor($user))
@@ -162,7 +161,7 @@ test('reporting fails when the registration event is inactive', function () {
 test('reporting fails when the student is not on a course stage', function () {
     $session = reportSessionRunningSession();
     $course = Course::factory()->create(['is_active' => true]);
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $profile = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     CourseEnrolment::factory()->create([

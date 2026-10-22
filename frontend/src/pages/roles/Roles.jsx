@@ -9,6 +9,16 @@ import { ListSearch } from '@/components/list-search'
 import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 
+/**
+ * The permission names a role bundles, condensed to their module
+ * domains — `fee-structures.view` and `fee-structures.manage` render as
+ * one "fee structures" pill. The backend enforces the full names; this
+ * column shows what areas the role reaches.
+ */
+function permissionDomains(permissions) {
+  return [...new Set(permissions.map((permission) => permission.split('.')[0]))]
+}
+
 export default function Roles() {
   const {
     items: roles,
@@ -33,7 +43,8 @@ export default function Roles() {
         <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
         <p className="text-sm text-muted-foreground">
           The roles used for access control across the school. They are fixed
-          by the application and cannot be created, edited or deleted.
+          by the application and cannot be created, edited or deleted. Each
+          bundles the permissions that decide what its users can access.
         </p>
       </div>
 
@@ -84,6 +95,7 @@ export default function Roles() {
                       onSort={toggleSort}
                     />
                     <th className="pb-3 font-medium">Description</th>
+                    <th className="pb-3 font-medium">Permissions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -93,6 +105,20 @@ export default function Roles() {
                       <td className="py-3">{role.name}</td>
                       <td className="py-3 text-muted-foreground">
                         {role.description ?? '—'}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {permissionDomains(role.permissions ?? []).map(
+                            (domain) => (
+                              <span
+                                key={domain}
+                                className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
+                              >
+                                {domain.replace(/-/g, ' ')}
+                              </span>
+                            ),
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

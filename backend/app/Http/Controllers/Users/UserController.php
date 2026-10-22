@@ -28,7 +28,9 @@ class UserController extends Controller
 
         $paginator = $this->paginateList(
             $request,
-            User::query(),
+            // The resource renders each user's roles and permissions, so
+            // they ride along with the page instead of loading per row.
+            User::query()->with(['roles.permissions', 'permissions']),
             searchable: ['name', 'email', 'login_id'],
             sortable: [
                 'name' => 'name',
@@ -37,7 +39,13 @@ class UserController extends Controller
             ],
             defaultOrder: [['name', 'asc']],
             applyFilters: function (Builder $query) use ($filters): void {
-                $query->when($filters['role'] ?? null, fn ($query, $role) => $query->where('role', $role));
+                $query->when(
+                    $filters['role'] ?? null,
+                    fn ($query, $role) => $query->whereHas(
+                        'roles',
+                        fn ($roles) => $roles->where('name', $role),
+                    ),
+                );
             },
         );
 

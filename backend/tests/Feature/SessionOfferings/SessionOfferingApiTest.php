@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\OfferingStatus;
-use App\Enums\Role;
 use App\Enums\TermEventName;
 use App\Models\AcademicSession;
 use App\Models\AcademicYear;
@@ -26,7 +25,7 @@ test('session offering endpoints require an access token', function () {
 });
 
 test('non-admin roles cannot manage session offerings', function () {
-    $token = sessionOfferingsAccessTokenFor(User::factory()->create(['role' => Role::Student]));
+    $token = sessionOfferingsAccessTokenFor(User::factory()->student()->create());
 
     $this->withToken($token)->getJson('/api/session-offerings')->assertForbidden();
     $this->withToken($token)->patchJson('/api/session-offerings/stage', [])->assertForbidden();

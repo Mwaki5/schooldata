@@ -3,19 +3,19 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Enums\Role;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     /**
      * Clear live references when a user is removed.
@@ -46,7 +46,6 @@ class User extends Authenticatable implements JWTSubject
         'email',
         'login_id',
         'password',
-        'role',
         'first_name',
         'middle_name',
         'last_name',
@@ -79,18 +78,6 @@ class User extends Authenticatable implements JWTSubject
     ];
 
     /**
-     * The model's default attribute values.
-     *
-     * New registrations omit `role`, so the default is applied at insert
-     * time instead of relying on the database default alone.
-     *
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'role' => 'student',
-    ];
-
-    /**
      * The attributes that should be hidden for serialization.
      *
      * @var list<string>
@@ -110,7 +97,6 @@ class User extends Authenticatable implements JWTSubject
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'role' => Role::class,
             'date_of_birth' => 'date',
             'is_pwd' => 'boolean',
             'must_reset_password' => 'boolean',
@@ -137,11 +123,18 @@ class User extends Authenticatable implements JWTSubject
     }
 
     /**
-     * Whether the user holds one of the given roles.
+     * The auth guard Spatie resolves for this user's roles and permissions.
+     *
+     * Laravel's Authenticate middleware re-points the default guard at
+     * `api` as soon as a request authenticates, so without this pin the
+     * same user could resolve `web` before a request and `api` after one
+     * — missing the catalog rows either way. The catalog is seeded for
+     * `web`, and RolePermissionSeeder reads this method so the two can
+     * never drift.
      */
-    public function hasRole(Role ...$roles): bool
+    public function guardName(): string
     {
-        return in_array($this->role, $roles, true);
+        return 'web';
     }
 
     /**

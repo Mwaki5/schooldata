@@ -2,7 +2,7 @@
 
 use App\Http\Middleware\EnsureAccessToken;
 use App\Http\Middleware\EnsureEmailIsVerified;
-use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\EnsurePermission;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'verified' => EnsureEmailIsVerified::class,
             'access.type' => EnsureAccessToken::class,
-            'role' => EnsureRole::class,
+            'permission' => EnsurePermission::class,
         ]);
 
         //

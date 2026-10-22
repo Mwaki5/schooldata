@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Models\FeeStructure;
 use App\Models\FeeStructureItem;
 use App\Models\User;
@@ -25,7 +24,7 @@ test('fee structure item endpoints require an access token', function () {
 
 test('only admins manage fee structure items', function () {
     $structure = FeeStructure::factory()->create();
-    $token = feeStructureItemsAccessTokenFor(User::factory()->create(['role' => Role::Trainer]));
+    $token = feeStructureItemsAccessTokenFor(User::factory()->trainer()->create());
 
     $this->withToken($token)->getJson('/api/fee-structures/'.$structure->id.'/items')->assertForbidden();
     $this->withToken($token)->postJson('/api/fee-structures/'.$structure->id.'/items', [])->assertForbidden();

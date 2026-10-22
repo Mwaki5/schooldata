@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Models\AcademicSession;
 use App\Models\CertificationLevel;
 use App\Models\Course;
@@ -26,7 +25,7 @@ test('enrolment endpoints require an access token', function () {
 });
 
 test('the enrolment list refuses non-admin tokens', function () {
-    $token = enrolmentsAccessTokenFor(User::factory()->create(['role' => Role::Student]));
+    $token = enrolmentsAccessTokenFor(User::factory()->student()->create());
 
     $this->withToken($token)->getJson('/api/enrolments')->assertForbidden();
 });
@@ -40,7 +39,7 @@ test('enrolments are listed newest first with every display relation', function 
         'first_name' => 'Amina',
         'middle_name' => null,
         'last_name' => 'Otieno',
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM001']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM001']),
     ]);
 
     $shared = [

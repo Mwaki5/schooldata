@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Enums\TermEventName;
 use App\Models\AcademicSession;
 use App\Models\CertificationLevel;
@@ -58,7 +57,7 @@ test('student endpoints require an access token', function () {
 });
 
 test('the student endpoints refuse non-admin tokens', function () {
-    $token = studentsAccessTokenFor(User::factory()->create(['role' => Role::Student]));
+    $token = studentsAccessTokenFor(User::factory()->student()->create());
 
     $this->withToken($token)->getJson('/api/students')->assertForbidden();
     $this->withToken($token)->postJson('/api/students', [])->assertForbidden();
@@ -69,7 +68,7 @@ test('students are listed by name with their account loaded', function () {
         'first_name' => 'Zara',
         'middle_name' => null,
         'last_name' => 'Kamau',
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM001']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM001']),
     ]);
     StudentProfile::factory()->create([
         'first_name' => 'Aaron',
@@ -99,7 +98,7 @@ test('the student list supports search, filters, sorting and pagination', functi
         'last_name' => 'Wanjiku',
         'gender' => 'female',
         'status' => 'active',
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM001']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM001']),
     ]);
     StudentProfile::factory()->create([
         'first_name' => 'Brian',
@@ -212,13 +211,12 @@ test('creating a student provisions the account and auto-creates the profile', f
 
     $user = User::where('login_id', 'ADM100')->firstOrFail();
 
-    expect($user->role)->toBe(Role::Student);
+    expect($user->load('roles')->hasRole('student'))->toBeTrue();
 
     $this->assertDatabaseHas('users', [
         'id' => $user->id,
         'email' => 'amina@school.test',
         'name' => 'Amina Wanjiku Otieno',
-        'role' => 'student',
         'must_reset_password' => true,
         'status' => 'active',
     ]);
@@ -334,7 +332,7 @@ test('a deleted student frees their admission number for re-admission', function
         'first_name' => 'Amina',
         'middle_name' => null,
         'last_name' => 'Otieno',
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM200']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM200']),
     ]);
     $accountId = $student->user_id;
 
@@ -370,7 +368,7 @@ test('a student update moves the display name and status to the account', functi
         'first_name' => 'Amina',
         'middle_name' => 'Grace',
         'last_name' => 'Wanjiku',
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM300']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM300']),
         'created_by' => $updater->id,
     ]);
 
@@ -412,7 +410,7 @@ test('a student update moves the display name and status to the account', functi
 
 test('updating a student validates the admission number excluding itself', function () {
     $student = StudentProfile::factory()->create([
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM300']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM300']),
     ]);
     User::factory()->create(['login_id' => 'ADM301']);
 
@@ -450,7 +448,7 @@ test('a student is deleted with their account and enrolments', function () {
     $token = studentsAccessTokenFor(User::factory()->create());
 
     $student = StudentProfile::factory()->create([
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM400']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM400']),
     ]);
     $enrolment = CourseEnrolment::factory()->create(['student_id' => $student->id]);
     $accountId = $student->user_id;
@@ -554,7 +552,7 @@ test('a student update also updates their enrolment', function () {
         'first_name' => 'Amina',
         'middle_name' => null,
         'last_name' => 'Otieno',
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM302']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM302']),
     ]);
     $enrolment = CourseEnrolment::factory()->create([
         'student_id' => $student->id,
@@ -706,7 +704,7 @@ test('moving a student to a later session is rejected when the next stage is clo
         'first_name' => 'Amina',
         'middle_name' => null,
         'last_name' => 'Otieno',
-        'user_id' => User::factory()->state(['role' => Role::Student, 'login_id' => 'ADM501']),
+        'user_id' => User::factory()->student()->state(['login_id' => 'ADM501']),
     ]);
 
     $course = Course::factory()->create(['total_modules' => 3]);

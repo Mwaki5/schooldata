@@ -2,13 +2,10 @@
 
 namespace App\Providers;
 
-use App\Enums\Role;
-use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Activitylog\Models\Activity;
@@ -36,14 +33,6 @@ class AppServiceProvider extends ServiceProvider
          * and N+1 queries can never creep back in unnoticed.
          */
         Model::preventLazyLoading();
-
-        /*
-         * Named abilities used by route middleware. Ownership is a role
-         * today; keeping the check behind a Gate means a future permission
-         * table or per-user grant changes this one definition instead of
-         * every route.
-         */
-        Gate::define('manage-session-offerings', fn (User $user): bool => $user->role === Role::Admin);
 
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
             return config('app.frontend_url')."/password-reset/$token?email={$notifiable->getEmailForPasswordReset()}";

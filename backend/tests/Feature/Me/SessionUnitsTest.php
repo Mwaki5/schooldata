@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\EnrolmentStatus;
-use App\Enums\Role;
 use App\Models\AcademicSession;
 use App\Models\AcademicSessionRegistration;
 use App\Models\AcademicYear;
@@ -48,7 +47,7 @@ function sessionUnitsReportedStudent(): array
     $course = Course::factory()->create(['is_active' => true]);
     $curriculum = Curriculum::factory()->create();
 
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $profile = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     CourseEnrolment::factory()->create([
@@ -106,15 +105,15 @@ test('the session units endpoints require an access token', function () {
     $this->postJson('/api/me/session-units', ['course_units' => [1]])->assertUnauthorized();
 });
 
-test('the session units endpoints refuse non-student tokens', function (Role $role) {
-    $token = sessionUnitsAccessTokenFor(User::factory()->create(['role' => $role]));
+test('the session units endpoints refuse non-student tokens', function (string $role) {
+    $token = sessionUnitsAccessTokenFor(User::factory()->{$role}()->create());
 
     $this->withToken($token)->getJson('/api/me/session-units')->assertForbidden();
     $this->withToken($token)->postJson('/api/me/session-units', ['course_units' => [1]])->assertForbidden();
 })->with([
-    'admin' => Role::Admin,
-    'trainer' => Role::Trainer,
-    'finance' => Role::Finance,
+    'admin' => 'admin',
+    'trainer' => 'trainer',
+    'finance' => 'finance',
 ]);
 
 test('nothing is offered before the student reports for the session', function () {
@@ -226,7 +225,7 @@ test('the units selection is required', function () {
 });
 
 test('the offered units are empty without an active session', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     StudentProfile::factory()->create(['user_id' => $user->id]);
 
     $this->withToken(sessionUnitsAccessTokenFor($user))

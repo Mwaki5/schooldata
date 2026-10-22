@@ -162,9 +162,14 @@ export default function Profile() {
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-3">
               <CardTitle>{user.name}</CardTitle>
-              <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground capitalize">
-                {user.role}
-              </span>
+              {(user.roles ?? []).map((role) => (
+                <span
+                  key={role}
+                  className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground capitalize"
+                >
+                  {role}
+                </span>
+              ))}
             </div>
             <CardDescription>{user.email}</CardDescription>
           </div>
@@ -193,9 +198,9 @@ export default function Profile() {
               <dd className="mt-0.5 font-medium">{user.login_id ?? '—'}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Role</dt>
+              <dt className="text-muted-foreground">Roles</dt>
               <dd className="mt-0.5 font-medium capitalize">
-                {user.role ?? '—'}
+                {user.roles?.length ? user.roles.join(', ') : '—'}
               </dd>
             </div>
             <div>

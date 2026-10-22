@@ -64,8 +64,8 @@ test('the user list can be searched by name or email', function () {
 });
 
 test('the user list can be filtered by role and sorted descending', function () {
-    User::factory()->create(['name' => 'Ada Lovelace', 'role' => 'trainer']);
-    User::factory()->create(['name' => 'Grace Hopper', 'role' => 'admin']);
+    User::factory()->trainer()->create(['name' => 'Ada Lovelace']);
+    User::factory()->create(['name' => 'Grace Hopper']);
 
     $token = usersAccessTokenFor(User::factory()->create());
 

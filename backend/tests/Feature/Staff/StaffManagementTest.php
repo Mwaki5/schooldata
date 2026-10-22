@@ -161,10 +161,11 @@ test('creating staff provisions an account and returns a one-time temporary pass
     expect($temporaryPassword)->toBeString()->not->toBeEmpty();
 
     $user = User::where('login_id', 'TSC-000123')->firstOrFail();
+    $user->load('roles');
 
     expect($user->name)->toBe('Jane Ann Doe')
         ->and($user->email)->toBe('jane.doe@school.test')
-        ->and($user->role->value)->toBe('finance')
+        ->and($user->hasRole('finance'))->toBeTrue()
         ->and($user->gender)->toBe('female')
         ->and($user->must_reset_password)->toBeTrue()
         ->and(Hash::check($temporaryPassword, $user->password))->toBeTrue();
@@ -203,9 +204,13 @@ test('a minimal staff record provisions an account with a placeholder email', fu
         'login_id' => 'EMP-0002',
         'email' => 'emp-0002@staff.invalid',
         'name' => 'John Otieno',
-        'role' => 'trainer',
         'must_reset_password' => 1,
     ]);
+
+    // The staff profile's role rides along as the account's auth role.
+    $account = User::where('login_id', 'EMP-0002')->firstOrFail();
+
+    expect($account->load('roles')->hasRole('trainer'))->toBeTrue();
 });
 
 test('creating staff validates the required fields and department reference', function () {
@@ -370,9 +375,13 @@ test('updating staff syncs the linked account', function () {
         'first_name' => 'Jane',
         'middle_name' => 'Ann',
         'last_name' => 'Revised',
-        'role' => 'admin',
         'email' => 'emp-0009@staff.invalid',
     ]);
+
+    // The profile's role change replaced the account's auth role.
+    $account = User::findOrFail($userId);
+
+    expect($account->load('roles')->getRoleNames()->all())->toBe(['admin']);
 });
 
 test('updating staff validates the employment number excluding itself', function () {

@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Models\Course;
 use App\Models\CourseUnit;
 use App\Models\Curriculum;
@@ -64,17 +63,17 @@ test('my grades requires an access token', function () {
 });
 
 test('my grades refuses non-student tokens', function () {
-    $this->withToken(myGradesAccessTokenFor(User::factory()->create(['role' => Role::Admin])))
+    $this->withToken(myGradesAccessTokenFor(User::factory()->create()))
         ->getJson('/api/me/grades')
         ->assertForbidden();
 
-    $this->withToken(myGradesAccessTokenFor(User::factory()->create(['role' => Role::Trainer])))
+    $this->withToken(myGradesAccessTokenFor(User::factory()->trainer()->create()))
         ->getJson('/api/me/grades')
         ->assertForbidden();
 });
 
 test('my grades lists registered units with marks and averages, latest session first', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $student = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     // Created first, so its auto-incremented session id is the older one.
@@ -140,7 +139,7 @@ test('my grades lists registered units with marks and averages, latest session f
 });
 
 test('my grades skips registered units without any recorded mark', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $student = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     $graded = myGradesRegistration($student, ['code' => 'DFDT 1101']);
@@ -157,7 +156,7 @@ test('my grades skips registered units without any recorded mark', function () {
 });
 
 test('my grades never leaks another student\'s marks', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     StudentProfile::factory()->create(['user_id' => $user->id]);
 
     $theirs = myGradesRegistration(StudentProfile::factory()->create(), ['code' => 'DFDT 1101']);
@@ -171,7 +170,7 @@ test('my grades never leaks another student\'s marks', function () {
 });
 
 test('my grades search narrows rows by unit code or name', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $student = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     $design = myGradesRegistration($student, ['code' => 'DFDT 1101', 'name' => 'Fashion Design I']);
@@ -193,7 +192,7 @@ test('my grades search narrows rows by unit code or name', function () {
 });
 
 test('my grades module filter narrows rows to units taught in that module', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $student = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     $first = myGradesRegistration($student, ['code' => 'DFDT 1101', 'modules_taught' => 1]);
@@ -210,7 +209,7 @@ test('my grades module filter narrows rows to units taught in that module', func
 });
 
 test('my grades lists every module the student has registered units for', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $student = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     myGradesRegistration($student, ['code' => 'DFDT 1301', 'modules_taught' => 3]);
@@ -226,7 +225,7 @@ test('my grades lists every module the student has registered units for', functi
 });
 
 test('a student without a profile row gets an empty sheet', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
 
     $this->withToken(myGradesAccessTokenFor($user))
         ->getJson('/api/me/grades')

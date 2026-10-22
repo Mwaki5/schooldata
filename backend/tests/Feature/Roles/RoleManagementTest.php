@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\Permission;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -16,18 +18,18 @@ test('the roles endpoint requires an access token', function () {
 });
 
 test('the roles endpoint is restricted to admins', function () {
-    $trainer = User::factory()->create(['role' => 'trainer']);
+    $trainer = User::factory()->trainer()->create();
 
     $this->withToken(rolesAccessTokenFor($trainer))
         ->getJson('/api/roles')
         ->assertForbidden();
 });
 
-test('the roles endpoint returns the hardcoded catalog in enum order', function () {
-    $this->withToken(rolesAccessTokenFor(User::factory()->create()))
+test('the roles endpoint returns the catalog in enum order with each roles permissions', function () {
+    $response = $this->withToken(rolesAccessTokenFor(User::factory()->create()))
         ->getJson('/api/roles')
         ->assertOk()
-        ->assertJsonStructure(['roles' => [['id', 'name', 'slug', 'description']]])
+        ->assertJsonStructure(['roles' => [['id', 'name', 'slug', 'description', 'permissions']]])
         ->assertJsonCount(4, 'roles')
         ->assertJsonPath('roles.0.slug', 'admin')
         ->assertJsonPath('roles.0.name', 'Admin')
@@ -37,6 +39,31 @@ test('the roles endpoint returns the hardcoded catalog in enum order', function 
         ->assertJsonPath('roles.2.name', 'Student')
         ->assertJsonPath('roles.3.slug', 'finance')
         ->assertJsonPath('roles.3.name', 'Finance');
+
+    $roles = collect($response->json('roles'))->keyBy('slug');
+
+    // The admin bundle is every permission except the student portal,
+    // which renders the signed-in account's own student data.
+    $adminPermissions = collect(Permission::cases())
+        ->map->value
+        ->reject(fn (string $permission): bool => $permission === 'student-portal')
+        ->sort()
+        ->values()
+        ->all();
+
+    expect($roles['admin']['permissions'])
+        ->toBe($adminPermissions)
+        ->and($roles['trainer']['permissions'])
+        ->toBe(['unit-grades.manage', 'unit-grades.view'])
+        ->and($roles['student']['permissions'])
+        ->toBe(['student-portal'])
+        ->and($roles['finance']['permissions'])
+        ->toBe([
+            'course-fee-assignments.manage',
+            'course-fee-assignments.view',
+            'fee-structures.manage',
+            'fee-structures.view',
+        ]);
 });
 
 test('the roles list supports search, sorting and pagination', function () {
@@ -64,14 +91,13 @@ test('the roles list supports search, sorting and pagination', function () {
         ->assertJsonPath('meta.total', 4);
 });
 
-test('roles cannot be tampered with because they no longer live in the database', function () {
-    expect(Schema::hasTable('roles'))->toBeFalse();
-
-    // The catalog still renders even though the table is gone.
-    $this->withToken(rolesAccessTokenFor(User::factory()->create()))
-        ->getJson('/api/roles')
-        ->assertOk()
-        ->assertJsonCount(4, 'roles');
+test('the catalog is mirrored into the permission tables for assignment', function () {
+    expect(Schema::hasTable('roles'))->toBeTrue()
+        ->and(Schema::hasTable('permissions'))->toBeTrue()
+        ->and(DB::table('roles')->orderBy('id')->pluck('name')->all())
+        ->toBe(['admin', 'trainer', 'student', 'finance'])
+        ->and(DB::table('permissions')->count())
+        ->toBe(count(Permission::cases()));
 });
 
 test('roles cannot be created through the api', function () {

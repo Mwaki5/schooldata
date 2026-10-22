@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Models\Course;
 use App\Models\CourseEnrolment;
 use App\Models\CourseUnit;
@@ -46,11 +45,11 @@ test('my units requires an access token', function () {
 });
 
 test('my units refuses non-student tokens', function () {
-    $this->withToken(myUnitsAccessTokenFor(User::factory()->create(['role' => Role::Admin])))
+    $this->withToken(myUnitsAccessTokenFor(User::factory()->create()))
         ->getJson('/api/me/units')
         ->assertForbidden();
 
-    $this->withToken(myUnitsAccessTokenFor(User::factory()->create(['role' => Role::Trainer])))
+    $this->withToken(myUnitsAccessTokenFor(User::factory()->trainer()->create()))
         ->getJson('/api/me/units')
         ->assertForbidden();
 });
@@ -61,7 +60,7 @@ test('my units groups the units of every enrolment by course and curriculum', fu
     $diplomaCurriculum = Curriculum::factory()->create(['name' => 'TVET Diploma Curriculum']);
     $certificateCurriculum = Curriculum::factory()->create(['name' => 'TVET Certificate Curriculum']);
 
-    $user = User::factory()->create(['role' => Role::Student, 'login_id' => 'ADM-2026-0001']);
+    $user = User::factory()->student()->create(['login_id' => 'ADM-2026-0001']);
     $student = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     CourseEnrolment::factory()->create([
@@ -165,7 +164,7 @@ test('my units never leaks another student\'s course units', function () {
         'code' => 'DIT 1101',
     ]);
 
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     StudentProfile::factory()->create(['user_id' => $user->id]);
 
     // A different student is enrolled in that course; our student is not.
@@ -182,7 +181,7 @@ test('my units never leaks another student\'s course units', function () {
 });
 
 test('a student without a profile row gets no groups', function () {
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
 
     $this->withToken(myUnitsAccessTokenFor($user))
         ->getJson('/api/me/units')
@@ -194,7 +193,7 @@ test('an enrolment whose course has no units still renders an empty group', func
     $course = Course::factory()->create(['name' => 'Diploma in ICT']);
     $curriculum = Curriculum::factory()->create();
 
-    $user = User::factory()->create(['role' => Role::Student]);
+    $user = User::factory()->student()->create();
     $student = StudentProfile::factory()->create(['user_id' => $user->id]);
 
     CourseEnrolment::factory()->create([

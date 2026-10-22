@@ -42,6 +42,39 @@ enum Role: string
     }
 
     /**
+     * The permissions this role bundles, as granted by the application.
+     *
+     * A user may hold several roles; their effective permissions are the
+     * union of every role's bundle. Routes and UI check these permission
+     * names, never the role names themselves.
+     *
+     * @return list<Permission>
+     */
+    public function permissions(): array
+    {
+        return match ($this) {
+            // Every module permission; the student portal is excluded
+            // because it renders the signed-in account's own student
+            // data, which only student accounts have.
+            self::Admin => array_values(array_filter(
+                Permission::cases(),
+                fn (Permission $permission): bool => $permission !== Permission::StudentPortal,
+            )),
+            self::Trainer => [
+                Permission::UnitGradesView,
+                Permission::UnitGradesManage,
+            ],
+            self::Student => [Permission::StudentPortal],
+            self::Finance => [
+                Permission::FeeStructuresView,
+                Permission::FeeStructuresManage,
+                Permission::CourseFeeAssignmentsView,
+                Permission::CourseFeeAssignmentsManage,
+            ],
+        };
+    }
+
+    /**
      * The hardcoded catalog served by GET /api/roles.
      *
      * Ids are stable positional values (1-4) so clients can key by them.

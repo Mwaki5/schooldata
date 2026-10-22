@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -31,10 +30,63 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
-            // Factory users stand in for pre-RBAC accounts, so they act as
-            // full-access admins by default; override per test as needed.
-            'role' => Role::Admin,
         ];
+    }
+
+    /**
+     * Configure the factory after making a model.
+     *
+     * Factory users stand in for real accounts, so they carry the
+     * full-access admin role by default; the role states below swap it
+     * for the role under test (their hooks run after this one).
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->assignRole('admin');
+        });
+    }
+
+    /**
+     * The full-access admin role — the factory default, named so role
+     * datasets can select it like the others.
+     */
+    public function admin(): static
+    {
+        return $this;
+    }
+
+    /**
+     * The signed-in trainer role: grades units through the console.
+     */
+    public function trainer(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->removeRole('admin');
+            $user->assignRole('trainer');
+        });
+    }
+
+    /**
+     * The signed-in student role: the self-service portal only.
+     */
+    public function student(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->removeRole('admin');
+            $user->assignRole('student');
+        });
+    }
+
+    /**
+     * The finance role: the fees modules.
+     */
+    public function finance(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $user->removeRole('admin');
+            $user->assignRole('finance');
+        });
     }
 
     /**

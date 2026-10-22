@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Enums\OfferingStatus;
-use App\Enums\Role;
 use App\Models\AcademicSession;
 use App\Models\AcademicYear;
 use App\Models\CertificationLevel;
@@ -1188,7 +1187,6 @@ class DemoDataSeeder extends Seeder
                     'name' => User::composeName($definition['first_name'], $definition['middle_name'], $definition['last_name']),
                     'email' => Str::lower($definition['admission_no']).'@student.invalid',
                     'password' => Hash::make(self::DEMO_PASSWORD),
-                    'role' => Role::Student,
                     'first_name' => $definition['first_name'],
                     'middle_name' => $definition['middle_name'],
                     'last_name' => $definition['last_name'],
@@ -1201,6 +1199,8 @@ class DemoDataSeeder extends Seeder
                     'updated_by' => $this->adminId,
                 ],
             );
+
+            $user->assignRole('student');
 
             $profile = StudentProfile::firstOrCreate(
                 ['user_id' => $user->id],
@@ -1279,7 +1279,6 @@ class DemoDataSeeder extends Seeder
                     'name' => $name,
                     'email' => $definition['work_email'],
                     'password' => Hash::make(self::DEMO_PASSWORD),
-                    'role' => $definition['role'],
                     'first_name' => $definition['first_name'],
                     'middle_name' => $definition['middle_name'],
                     'last_name' => $definition['last_name'],
@@ -1294,6 +1293,8 @@ class DemoDataSeeder extends Seeder
                     'updated_by' => $this->adminId,
                 ],
             );
+
+            $user->assignRole($definition['role']);
 
             Staff::firstOrCreate(
                 ['employment_no' => $definition['employment_no']],

@@ -35,6 +35,10 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->string('password')),
         ]);
 
+        // New accounts are students; access grows through roles and the
+        // permissions they bundle.
+        $user->assignRole('student');
+
         event(new Registered($user));
 
         activity('auth')

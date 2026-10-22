@@ -15,8 +15,8 @@ function rbacAccessTokenFor(User $user): string
     return JWTAuth::claims(['type' => 'access'])->fromUser($user);
 }
 
-test('non-admin roles are forbidden from every management endpoint', function (string $role) {
-    $user = User::factory()->create(['role' => $role]);
+test('roles without management permissions are forbidden from every management endpoint', function (string $role) {
+    $user = User::factory()->{$role}()->create();
     $token = rbacAccessTokenFor($user);
 
     $department = Department::factory()->create();
@@ -38,7 +38,7 @@ test('non-admin roles are forbidden from every management endpoint', function (s
     $this->withToken($token)->deleteJson('/api/staff/'.$staffMember->id)->assertForbidden();
 })->with(['trainer', 'student', 'finance']);
 
-test('an admin can access every management endpoint', function () {
+test('a role holding every permission can access every management endpoint', function () {
     $token = rbacAccessTokenFor(User::factory()->create());
 
     $this->withToken($token)->getJson('/api/roles')->assertOk();
@@ -58,38 +58,72 @@ test('management endpoints still require an access token', function () {
     $this->getJson('/api/staff')->assertUnauthorized();
 });
 
-test('a route accepts one or many roles in a single middleware tag', function (string $roleList, string $role, int $expectedStatus) {
-    Route::get('/api/_role-probe', fn () => response()->json(['ok' => true]))
-        ->middleware(['auth:api', 'access.type', 'role:'.$roleList]);
+test('a route accepts one or many permissions in a single middleware tag', function (string $permissionList, string $role, int $expectedStatus) {
+    Route::get('/api/_permission-probe', fn () => response()->json(['ok' => true]))
+        ->middleware(['auth:api', 'access.type', 'permission:'.$permissionList]);
 
-    $user = User::factory()->create(['role' => $role]);
+    $user = User::factory()->{$role}()->create();
 
     // One token per test case: the auth guard caches the resolved user
     // for the lifetime of the app instance, so cases must not share one.
     $this->withToken(rbacAccessTokenFor($user))
-        ->getJson('/api/_role-probe')
+        ->getJson('/api/_permission-probe')
         ->assertStatus($expectedStatus);
 })->with([
-    'single role: admin allowed' => ['admin', 'admin', 200],
-    'single role: trainer blocked' => ['admin', 'trainer', 403],
-    'two roles: admin allowed' => ['admin,finance', 'admin', 200],
-    'two roles: finance allowed' => ['admin,finance', 'finance', 200],
-    'two roles: trainer blocked' => ['admin,finance', 'trainer', 403],
-    'two roles: student blocked' => ['admin,finance', 'student', 403],
-    'two roles reversed: finance allowed' => ['finance,admin', 'finance', 200],
-    'three roles: trainer allowed' => ['admin,trainer,finance', 'trainer', 200],
-    'three roles: student blocked' => ['admin,trainer,finance', 'student', 403],
-    'all four roles: student allowed' => ['admin,trainer,student,finance', 'student', 200],
-    'unknown role in the tag fails closed for everyone' => ['bogus', 'admin', 403],
+    'single permission: admin holds it' => ['units.view', 'admin', 200],
+    'single permission: trainer blocked' => ['units.view', 'trainer', 403],
+    'two permissions: admin allowed' => ['units.view,fee-structures.view', 'admin', 200],
+    'two permissions: finance allowed through fees' => ['units.view,fee-structures.view', 'finance', 200],
+    'two permissions: trainer blocked' => ['units.view,fee-structures.view', 'trainer', 403],
+    'unknown permission fails closed for everyone' => ['bogus', 'admin', 403],
 ]);
 
-test('the authenticated user profile includes their role', function () {
-    $user = User::factory()->create(['role' => 'finance']);
+test('the authenticated user profile carries their roles and permissions', function () {
+    $user = User::factory()->finance()->create();
 
     $this->withToken(rbacAccessTokenFor($user))
         ->getJson('/api/user')
         ->assertOk()
-        ->assertJsonPath('user.role', 'finance');
+        ->assertJsonPath('user.roles', ['finance'])
+        ->assertJsonPath('user.permissions', [
+            'course-fee-assignments.manage',
+            'course-fee-assignments.view',
+            'fee-structures.manage',
+            'fee-structures.view',
+        ]);
+});
+
+test('a user may hold many roles and their permissions add up', function () {
+    $user = User::factory()->finance()->create();
+    $user->assignRole('trainer');
+    $user->load('roles');
+
+    $token = rbacAccessTokenFor($user);
+
+    // From finance: the fees modules open.
+    $this->withToken($token)->getJson('/api/fee-structures')->assertOk();
+
+    // From trainer: the grading console's endpoints are reachable — a
+    // student without the permission is refused the same one.
+    $reachable = $this->withToken($token)->getJson('/api/unit-grades/units');
+
+    expect($reachable->status())->not->toBe(403);
+
+    // Still nothing beyond the two bundles.
+    $this->withToken($token)->getJson('/api/departments')->assertForbidden();
+
+    expect($user->getRoleNames()->all())->toContain('finance', 'trainer');
+});
+
+test('a permission granted to the user alone decides access', function () {
+    $user = User::factory()->finance()->create();
+    $user->givePermissionTo('departments.view');
+
+    $token = rbacAccessTokenFor($user);
+
+    // The direct grant opens the read endpoint only; manage stays closed.
+    $this->withToken($token)->getJson('/api/departments')->assertOk();
+    $this->withToken($token)->postJson('/api/departments', ['name' => 'Intrusion'])->assertForbidden();
 });
 
 test('new registrations default to the student role', function () {
@@ -100,25 +134,27 @@ test('new registrations default to the student role', function () {
         'password_confirmation' => 'password123',
     ]);
 
-    $response->assertCreated()->assertJsonPath('user.role', 'student');
+    $response->assertCreated()->assertJsonPath('user.roles', ['student']);
 
-    $this->assertDatabaseHas('users', [
-        'email' => 'fresh.student@example.com',
-        'role' => 'student',
-    ]);
+    $user = User::where('email', 'fresh.student@example.com')->firstOrFail();
+
+    expect($user->load('roles')->hasRole('student'))->toBeTrue();
 });
 
-test('a registration request cannot choose its own role', function () {
+test('a registration request cannot choose its own access', function () {
     $this->postJson('/api/register', [
         'name' => 'Sneaky User',
         'email' => 'sneaky@example.com',
         'password' => 'password123',
         'password_confirmation' => 'password123',
         'role' => 'admin',
+        'roles' => ['admin'],
+        'permissions' => ['users.manage'],
     ])->assertCreated();
 
-    $this->assertDatabaseHas('users', [
-        'email' => 'sneaky@example.com',
-        'role' => 'student',
-    ]);
+    $user = User::where('email', 'sneaky@example.com')->firstOrFail();
+    $user->load(['roles.permissions', 'permissions']);
+
+    expect($user->getRoleNames()->all())->toBe(['student'])
+        ->and($user->getAllPermissions()->pluck('name')->all())->toBe(['student-portal']);
 });

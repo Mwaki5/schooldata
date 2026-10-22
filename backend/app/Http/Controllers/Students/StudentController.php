@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Students;
 
-use App\Enums\Role;
 use App\Enums\StageOpenReason;
 use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
@@ -231,13 +230,14 @@ class StudentController extends Controller
             'name' => $name,
             'email' => $validated['email'] ?? $user->email ?? $this->fallbackEmail($validated['admission_no']),
             'login_id' => $validated['admission_no'],
-            'role' => Role::Student,
             'status' => $validated['status'] ?? 'active',
             'must_reset_password' => true,
             'password' => $temporaryPassword,
         ]);
 
         $user->restore();
+
+        $user->syncRoles(['student']);
 
         return [$user, $temporaryPassword];
     }
@@ -264,11 +264,12 @@ class StudentController extends Controller
             'name' => $name,
             'email' => $validated['email'] ?? $user->email,
             'login_id' => $validated['admission_no'],
-            'role' => Role::Student,
             'status' => $validated['status'] ?? $student->status,
         ]);
 
         $user->restore();
+
+        $user->syncRoles(['student']);
     }
 
     /**

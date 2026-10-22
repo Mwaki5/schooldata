@@ -5,9 +5,10 @@ import StudentDashboard from '@/pages/StudentDashboard'
 export default function Dashboard() {
   const { user } = useAuth()
 
-  // Students get their own dashboard; every other role keeps the
-  // placeholder until its module dashboard is built.
-  if (user?.role === 'student') {
+  // Students get their own dashboard; every other account keeps the
+  // placeholder until its module dashboard is built. The portal
+  // permission is what marks a student account.
+  if (user?.permissions?.includes('student-portal')) {
     return <StudentDashboard />
   }
 

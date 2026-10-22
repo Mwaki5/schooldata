@@ -213,12 +213,18 @@ class StaffController extends Controller
             ...$this->identityColumns($validated),
             'name' => $name,
             'email' => $this->accountEmail($validated),
-            'role' => $validated['role'],
             'must_reset_password' => true,
             'password' => $temporaryPassword,
         ]);
 
         $user->restore();
+
+        // The auth role rides along with the staff profile's role,
+        // replacing any previous one the way the old column overwrite
+        // did.
+        if (isset($validated['role'])) {
+            $user->syncRoles([$validated['role']]);
+        }
 
         return [$user, $temporaryPassword];
     }
@@ -250,11 +256,15 @@ class StaffController extends Controller
             ...$this->identityColumns($validated),
             'name' => $name,
             'email' => $this->accountEmail($validated, $staff),
-            'role' => $validated['role'] ?? $staff->role,
             'login_id' => $validated['employment_no'] ?? $staff->employment_no,
         ]);
 
         $user->restore();
+
+        // The auth role rides along with the staff profile's role,
+        // replacing any previous one the way the old column overwrite
+        // did.
+        $user->syncRoles([$validated['role'] ?? $staff->role]);
 
         return null;
     }

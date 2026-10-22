@@ -26,72 +26,67 @@ import { cn } from '@/lib/utils'
 /**
  * Top-level rail items. Each renders as its own row with a hairline divider
  * above it; items with `children` expand nested links inline.
- * Visibility is filtered by role (`roles`) before rendering.
+ * Visibility is filtered by the user's permissions before rendering.
  */
 const NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/' },
   {
     label: 'Access Control',
     icon: ShieldCheck,
-    roles: ['admin'],
     children: [
-      { label: 'Roles', to: '/roles', roles: ['admin'] },
-      { label: 'Users', disabled: true, roles: ['admin'] },
-      { label: 'Activity Log', to: '/activities', roles: ['admin'] },
+      { label: 'Roles', to: '/roles', permission: 'roles.view' },
+      { label: 'Users', disabled: true, permission: 'users.view' },
+      { label: 'Activity Log', to: '/activities', permission: 'activities.view' },
     ],
   },
   {
     label: 'Academics',
     icon: BookOpen,
-    roles: ['admin', 'student'],
     children: [
-      { label: 'Students', to: '/students', roles: ['admin'] },
-      { label: 'Enrolments', to: '/enrolments', roles: ['admin'] },
-      { label: 'Staff', to: '/staff', roles: ['admin'] },
-      { label: 'Classes', disabled: true, roles: ['admin'] },
-      { label: 'Departments', to: '/departments', roles: ['admin'] },
-      { label: 'Exam Bodies', to: '/exam-bodies', roles: ['admin'] },
-      { label: 'Grades', to: '/exam-body-grades', roles: ['admin'] },
-      { label: 'Certification Levels', to: '/certification-levels', roles: ['admin'] },
-      { label: 'Curriculum', to: '/curricula', roles: ['admin'] },
-      { label: 'Courses', to: '/courses', roles: ['admin'] },
-      { label: 'Units', to: '/units', roles: ['admin'] },
-      { label: 'Course Units', to: '/course-units', roles: ['admin'] },
+      { label: 'Students', to: '/students', permission: 'students.view' },
+      { label: 'Enrolments', to: '/enrolments', permission: 'enrolments.view' },
+      { label: 'Staff', to: '/staff', permission: 'staff.view' },
+      { label: 'Classes', disabled: true, permission: 'classes.view' },
+      { label: 'Departments', to: '/departments', permission: 'departments.view' },
+      { label: 'Exam Bodies', to: '/exam-bodies', permission: 'exam-bodies.view' },
+      { label: 'Grades', to: '/exam-body-grades', permission: 'exam-body-grades.view' },
+      { label: 'Certification Levels', to: '/certification-levels', permission: 'certification-levels.view' },
+      { label: 'Curriculum', to: '/curricula', permission: 'curricula.view' },
+      { label: 'Courses', to: '/courses', permission: 'courses.view' },
+      { label: 'Units', to: '/units', permission: 'units.view' },
+      { label: 'Course Units', to: '/course-units', permission: 'course-units.view' },
       // Students only ever see their own course's units, never the
       // admin catalogue.
-      { label: 'My Units', to: '/my-units', roles: ['student'] },
+      { label: 'My Units', to: '/my-units', permission: 'student-portal' },
     ],
   },
   {
     label: 'Calendar',
     icon: Calendar,
-    roles: ['admin'],
     children: [
-      { label: 'Academic Year', to: '/academic-years', roles: ['admin'] },
-      { label: 'Academic Session', to: '/academic-sessions', roles: ['admin'] },
-      { label: 'Open Session', to: '/session-offerings', roles: ['admin'] },
-      { label: 'Term Events', to: '/term-events', roles: ['admin'] },
+      { label: 'Academic Year', to: '/academic-years', permission: 'academic-years.view' },
+      { label: 'Academic Session', to: '/academic-sessions', permission: 'academic-sessions.view' },
+      { label: 'Open Session', to: '/session-offerings', permission: 'session-offerings.view' },
+      { label: 'Term Events', to: '/term-events', permission: 'term-events.view' },
     ],
   },
   { label: 'Attendance', icon: CalendarCheck, disabled: true },
   {
     label: 'Exams & Grades',
     icon: ClipboardList,
-    roles: ['admin', 'trainer', 'student'],
     children: [
-      { label: 'Unit Grading', to: '/unit-grades', roles: ['admin', 'trainer'] },
-      { label: 'Marksheet', to: '/marksheet', roles: ['admin', 'trainer'] },
+      { label: 'Unit Grading', to: '/unit-grades', permission: 'unit-grades.view' },
+      { label: 'Marksheet', to: '/marksheet', permission: 'unit-grades.view' },
       // The student's own marksheet: their registered units and marks.
-      { label: 'Grades', to: '/graded', roles: ['student'] },
+      { label: 'Grades', to: '/graded', permission: 'student-portal' },
     ],
   },
   {
     label: 'Fees',
     icon: Wallet,
-    roles: ['admin'],
     children: [
-      { label: 'Fee Structure', to: '/fee-structures', roles: ['admin'] },
-      { label: 'Course Fees', to: '/course-fee-assignments', roles: ['admin'] },
+      { label: 'Fee Structure', to: '/fee-structures', permission: 'fee-structures.view' },
+      { label: 'Course Fees', to: '/course-fee-assignments', permission: 'course-fee-assignments.view' },
     ],
   },
 ]
@@ -128,12 +123,13 @@ const PAGE_TITLES = {
 }
 
 /**
- * RBAC visibility: `roles` is an array of role slugs allowed to see the
- * nav item (group, link or disabled entry). Items without a `roles`
- * list are visible to every signed-in user.
+ * RBAC visibility: `permission` is the ability an item requires (group,
+ * link or disabled entry). Items without a `permission` are visible to
+ * every signed-in user; a group disappears once all its children are
+ * hidden.
  */
-function canAccess(item, role) {
-  return !item.roles || item.roles.includes(role)
+function canAccess(item, permissions) {
+  return !item.permission || permissions.includes(item.permission)
 }
 
 /**
@@ -214,17 +210,20 @@ function Sidebar({
 
   const initial = (user?.name ?? '?').trim().charAt(0).toUpperCase()
 
-  // RBAC: display only the links the signed-in user's role may access.
-  // Each nav item (group or individual link) carries its own `roles`
-  // array; groups whose children are all hidden disappear entirely.
-  const userRole = user?.role
-  const visibleNavItems = NAV_ITEMS.filter((item) => canAccess(item, userRole))
+  // RBAC: display only the links the signed-in user's permissions allow.
+  // Each nav item (group or individual link) carries its own
+  // `permission`; groups whose children are all hidden disappear
+  // entirely.
+  const userPermissions = user?.permissions ?? []
+  const visibleNavItems = NAV_ITEMS.filter((item) =>
+    canAccess(item, userPermissions),
+  )
     .map((item) =>
       item.children
         ? {
             ...item,
             children: item.children.filter((child) =>
-              canAccess(child, userRole),
+              canAccess(child, userPermissions),
             ),
           }
         : item,

@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Models\AcademicSession;
 use App\Models\AcademicYear;
 use App\Models\CertificationLevel;
@@ -25,13 +24,13 @@ test('the student dashboard requires an access token', function () {
 });
 
 test('the student dashboard refuses admin tokens', function () {
-    $token = studentDashboardAccessTokenFor(User::factory()->create(['role' => Role::Admin]));
+    $token = studentDashboardAccessTokenFor(User::factory()->create());
 
     $this->withToken($token)->getJson('/api/me/dashboard')->assertForbidden();
 });
 
 test('the student dashboard refuses trainer tokens', function () {
-    $token = studentDashboardAccessTokenFor(User::factory()->create(['role' => Role::Trainer]));
+    $token = studentDashboardAccessTokenFor(User::factory()->trainer()->create());
 
     $this->withToken($token)->getJson('/api/me/dashboard')->assertForbidden();
 });
@@ -70,7 +69,7 @@ test('the dashboard returns the student profile, academic calendar and own enrol
         ]),
     );
 
-    $user = User::factory()->create(['role' => Role::Student, 'login_id' => 'ADM-2026-0001']);
+    $user = User::factory()->student()->create(['login_id' => 'ADM-2026-0001']);
     $student = StudentProfile::factory()->create([
         'user_id' => $user->id,
         'first_name' => 'Amina',
@@ -146,7 +145,7 @@ test('the dashboard returns the student profile, academic calendar and own enrol
 });
 
 test('a student without a profile row gets an empty dashboard', function () {
-    $user = User::factory()->create(['role' => Role::Student, 'login_id' => 'ADM-2026-9999']);
+    $user = User::factory()->student()->create(['login_id' => 'ADM-2026-9999']);
 
     $this->withToken(studentDashboardAccessTokenFor($user))
         ->getJson('/api/me/dashboard')

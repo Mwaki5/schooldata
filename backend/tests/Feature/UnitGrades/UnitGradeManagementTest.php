@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Enums\UnitExamType;
 use App\Models\AcademicSession;
 use App\Models\AcademicYear;
@@ -44,7 +43,7 @@ function unitGradesRegisteredStudent(): array
         'end_date' => '2026-12-18',
     ]);
 
-    $studentUser = User::factory()->create(['role' => Role::Student, 'login_id' => 'ADM-2026-099']);
+    $studentUser = User::factory()->student()->create(['login_id' => 'ADM-2026-099']);
     $profile = StudentProfile::factory()->create(['user_id' => $studentUser->id]);
     $unit = Unit::factory()->create(['code' => 'U100', 'name' => 'Basics']);
     $link = CourseUnit::factory()->create(['unit_id' => $unit->id]);
@@ -56,7 +55,7 @@ function unitGradesRegisteredStudent(): array
     ]);
 
     return [
-        'token' => unitGradesAccessTokenFor(User::factory()->create(['role' => Role::Admin])),
+        'token' => unitGradesAccessTokenFor(User::factory()->create()),
         'session' => $session,
         'profile' => $profile,
         'unit' => $unit,
@@ -80,7 +79,7 @@ function unitGradesMarksheetClass(): array
     unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Practical, 1, 80);
     unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Practical, 2, 74);
 
-    $mateUser = User::factory()->create(['role' => Role::Student, 'login_id' => 'ADM-2026-098']);
+    $mateUser = User::factory()->student()->create(['login_id' => 'ADM-2026-098']);
     $mate = StudentProfile::factory()->create(['user_id' => $mateUser->id]);
     UnitRegistration::factory()->create([
         'academic_session_id' => $setup['session']->id,
@@ -129,8 +128,8 @@ test('the unit grade endpoints require an access token', function () {
     $this->putJson('/api/unit-grades', [])->assertUnauthorized();
 });
 
-test('the unit grade endpoints refuse students and finance', function (Role $role) {
-    $token = unitGradesAccessTokenFor(User::factory()->create(['role' => $role]));
+test('the unit grade endpoints refuse students and finance', function (string $role) {
+    $token = unitGradesAccessTokenFor(User::factory()->{$role}()->create());
 
     $this->withToken($token)->getJson('/api/unit-grades/units')->assertForbidden();
     $this->withToken($token)->getJson('/api/unit-grades/students?course_unit_id=1')->assertForbidden();
@@ -139,8 +138,8 @@ test('the unit grade endpoints refuse students and finance', function (Role $rol
     $this->withToken($token)->getJson('/api/unit-grades?student_id=1')->assertForbidden();
     $this->withToken($token)->putJson('/api/unit-grades', [])->assertForbidden();
 })->with([
-    'student' => Role::Student,
-    'finance' => Role::Finance,
+    'student' => 'student',
+    'finance' => 'finance',
 ]);
 
 test('the console shows the selected registered unit with its grading progress', function () {
@@ -537,7 +536,7 @@ test('the export refuses when there is no session to export', function () {
 
 test('a trainer can award marks with audit stamps', function () {
     $setup = unitGradesRegisteredStudent();
-    $trainer = User::factory()->create(['role' => Role::Trainer]);
+    $trainer = User::factory()->trainer()->create();
 
     $this->withToken(unitGradesAccessTokenFor($trainer))
         ->putJson('/api/unit-grades', [

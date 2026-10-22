@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Me;
 
-use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\AcademicSessionRegistration;
@@ -29,7 +28,7 @@ class ReportSessionController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role !== Role::Student) {
+        if (! $user->hasRole('student')) {
             abort(403, 'Only students can report for a session.');
         }
 

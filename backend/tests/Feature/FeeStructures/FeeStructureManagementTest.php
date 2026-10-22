@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Role;
 use App\Models\FeeStructure;
 use App\Models\User;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -19,12 +18,12 @@ test('fee structure endpoints require an access token', function () {
 });
 
 test('only admins may manage fee structures', function () {
-    $token = feeStructuresAccessTokenFor(User::factory()->create(['role' => Role::Trainer]));
+    $token = feeStructuresAccessTokenFor(User::factory()->trainer()->create());
 
     $this->withToken($token)->getJson('/api/fee-structures')->assertForbidden();
     $this->withToken($token)->postJson('/api/fee-structures', [])->assertForbidden();
 
-    $studentToken = feeStructuresAccessTokenFor(User::factory()->create(['role' => Role::Student]));
+    $studentToken = feeStructuresAccessTokenFor(User::factory()->student()->create());
 
     $this->withToken($studentToken)->getJson('/api/fee-structures')->assertForbidden();
 });

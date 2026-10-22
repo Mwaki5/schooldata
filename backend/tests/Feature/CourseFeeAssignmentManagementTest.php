@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\FeeSpan;
-use App\Enums\Role;
 use App\Models\Course;
 use App\Models\CourseFeeAssignment;
 use App\Models\Curriculum;
@@ -23,7 +22,7 @@ test('course fee assignment endpoints require an access token', function () {
 });
 
 test('only admins manage course fee assignments', function () {
-    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create(['role' => Role::Trainer]));
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->trainer()->create());
 
     $this->withToken($token)->getJson('/api/course-fee-assignments')->assertForbidden();
     $this->withToken($token)->postJson('/api/course-fee-assignments', [])->assertForbidden();

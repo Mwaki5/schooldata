@@ -60,7 +60,7 @@ test('the activity log shows the user who caused each entry', function () {
 });
 
 test('non-admin roles cannot view the activity log', function (string $role) {
-    $user = User::factory()->create(['role' => $role]);
+    $user = User::factory()->{$role}()->create();
 
     $this->withToken(activityIndexAccessTokenFor($user))
         ->getJson('/api/activities')
