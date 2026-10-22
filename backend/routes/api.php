@@ -15,6 +15,7 @@ use App\Http\Controllers\Enrolments\EnrolmentController;
 use App\Http\Controllers\ExamBodies\ExamBodyController;
 use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
 use App\Http\Controllers\Me\DashboardController;
+use App\Http\Controllers\Me\MyGradesController;
 use App\Http\Controllers\Me\MyUnitsController;
 use App\Http\Controllers\Me\ReportSessionController;
 use App\Http\Controllers\Me\SessionUnitsController;
@@ -105,6 +106,14 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:student')
         ->middleware('throttle:api')
         ->name('me.session-units.store');
+
+    // The signed-in student's own marks: their registered units with
+    // theory / practical papers and averages, laid out like the class
+    // marksheet but scoped to their own grades only.
+    Route::get('me/grades', MyGradesController::class)
+        ->middleware('role:student')
+        ->middleware('throttle:api')
+        ->name('me.grades');
 
     Route::get('roles', [RoleController::class, 'index'])
         ->middleware('role:admin')

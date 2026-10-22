@@ -60,6 +60,7 @@ const NAV_ITEMS = [
       // Students only ever see their own course's units, never the
       // admin catalogue.
       { label: 'My Units', to: '/my-units', roles: ['student'] },
+      { label: 'Grades', to: '/graded', roles: ['student'] },
     ],
   },
   {
@@ -99,6 +100,7 @@ const PAGE_TITLES = {
   '/units': 'Units',
   '/course-units': 'Course Units',
   '/my-units': 'My Units',
+  '/graded': 'Grades',
   '/academic-years': 'Academic Years',
   '/academic-sessions': 'Academic Sessions',
   '/session-offerings': 'Open Session',

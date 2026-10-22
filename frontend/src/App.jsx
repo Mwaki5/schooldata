@@ -44,6 +44,7 @@ const StudentForm = lazy(() => import('@/pages/students/StudentForm'))
 const Enrolments = lazy(() => import('@/pages/enrolments/Enrolments'))
 const Activities = lazy(() => import('@/pages/activities/Activities'))
 const Profile = lazy(() => import('@/pages/profile/Profile'))
+const MyGrades = lazy(() => import('@/pages/grades/Grades'))
 const MyUnits = lazy(() => import('@/pages/my-units/MyUnits'))
 const OpenSession = lazy(() => import('@/pages/session-offerings/OpenSession'))
 const UnitGrades = lazy(() => import('@/pages/unit-grades/UnitGrades'))
@@ -145,6 +146,7 @@ export default function App() {
             }
           >
             <Route path="/my-units" element={<MyUnits />} />
+            <Route path="/graded" element={<MyGrades />} />
           </Route>
           {/* Admin-only section: the backend applies the same
               `role:admin` middleware to every route below. */}
