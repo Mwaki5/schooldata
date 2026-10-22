@@ -18,6 +18,9 @@ class FeeStructureResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'is_active' => $this->is_active,
+            // The sum of the structure's live item amounts, eager-loaded
+            // as `total_amount` by the endpoints that list structures.
+            'total' => (float) ($this->total_amount ?? 0),
             'created_by' => $this->created_by,
             'updated_by' => $this->updated_by,
             'created_at' => $this->created_at,

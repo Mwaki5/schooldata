@@ -116,6 +116,7 @@ const PAGE_TITLES = {
   '/unit-grades': 'Unit Grading',
   '/marksheet': 'Marksheet',
   '/fee-structures': 'Fee Structures',
+  '/fee-structures/:feeStructureId/items': 'Fee Structure Items',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',

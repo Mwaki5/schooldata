@@ -30,7 +30,7 @@ class FeeStructureController extends Controller
 
         $paginator = $this->paginateList(
             $request,
-            FeeStructure::query(),
+            FeeStructure::query()->withSum('items as total_amount', 'amount'),
             searchable: ['name'],
             sortable: [
                 'name' => 'name',
@@ -68,10 +68,12 @@ class FeeStructureController extends Controller
     }
 
     /**
-     * Show a single fee structure.
+     * Show a single fee structure with its summed item total.
      */
     public function show(FeeStructure $feeStructure): JsonResponse
     {
+        $feeStructure->loadSum('items as total_amount', 'amount');
+
         return response()->json([
             'fee_structure' => new FeeStructureResource($feeStructure),
         ]);

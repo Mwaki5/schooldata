@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\FeeStructureFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -51,6 +52,14 @@ class FeeStructure extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * The named charges that add up to this structure's total.
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(FeeStructureItem::class);
     }
 
     /**

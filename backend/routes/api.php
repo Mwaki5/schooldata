@@ -15,6 +15,7 @@ use App\Http\Controllers\Enrolments\EnrolmentController;
 use App\Http\Controllers\ExamBodies\ExamBodyController;
 use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
 use App\Http\Controllers\FeeStructures\FeeStructureController;
+use App\Http\Controllers\FeeStructures\FeeStructureItemController;
 use App\Http\Controllers\Me\DashboardController;
 use App\Http\Controllers\Me\MyGradesController;
 use App\Http\Controllers\Me\MyUnitsController;
@@ -262,6 +263,26 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin')
         ->middleware('throttle:api')
         ->name('fee-structures.destroy');
+
+    // Fee structure items: the named charges nested under their structure
+    // so the parent is always known, and their live amounts sum into the
+    // structure's total.
+    Route::get('fee-structures/{feeStructure}/items', [FeeStructureItemController::class, 'index'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.items.index');
+    Route::post('fee-structures/{feeStructure}/items', [FeeStructureItemController::class, 'store'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.items.store');
+    Route::match(['PUT', 'PATCH'], 'fee-structures/{feeStructure}/items/{feeStructureItem}', [FeeStructureItemController::class, 'update'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.items.update');
+    Route::delete('fee-structures/{feeStructure}/items/{feeStructureItem}', [FeeStructureItemController::class, 'destroy'])
+        ->middleware('role:admin')
+        ->middleware('throttle:api')
+        ->name('fee-structures.items.destroy');
 
     Route::get('curricula', [CurriculumController::class, 'index'])
         ->middleware('role:admin')

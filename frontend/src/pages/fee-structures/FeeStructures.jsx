@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -25,6 +25,11 @@ function StatusBadge({ active }) {
     </span>
   )
 }
+
+const amountFormat = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
 
 export default function FeeStructures() {
   const [deletingId, setDeletingId] = useState(null)
@@ -132,6 +137,7 @@ export default function FeeStructures() {
                       order={order}
                       onSort={toggleSort}
                     />
+                    <th className="pb-3 text-right font-medium">Total</th>
                     <th className="pb-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -142,8 +148,21 @@ export default function FeeStructures() {
                       <td className="py-3">
                         <StatusBadge active={feeStructure.is_active} />
                       </td>
+                      <td className="py-3 text-right tabular-nums">
+                        {amountFormat.format(feeStructure.total ?? 0)}
+                      </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
+                          <Link
+                            to={`/fee-structures/${feeStructure.id}/items`}
+                            className={buttonVariants({
+                              variant: 'ghost',
+                              size: 'sm',
+                            })}
+                          >
+                            <ListChecks aria-hidden="true" />
+                            Items
+                          </Link>
                           <Link
                             to={`/fee-structures/${feeStructure.id}/edit`}
                             className={buttonVariants({
