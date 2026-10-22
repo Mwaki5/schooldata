@@ -3,6 +3,8 @@
 namespace App\Http\Requests\CourseFeeAssignments;
 
 use App\Enums\FeeSpan;
+use App\Models\CourseFeeAssignment;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -56,6 +58,31 @@ class StoreCourseFeeAssignmentRequest extends FormRequest
                 'required',
                 'integer',
                 Rule::exists('fee_structures', 'id')->whereNull('deleted_at'),
+                // Money guard: the same structure may not cover this
+                // course, curriculum and year both as a year fee and per
+                // session — the student would be charged twice.
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $otherSpan = $this->input('span') === FeeSpan::Session->value
+                        ? FeeSpan::Year->value
+                        : FeeSpan::Session->value;
+
+                    // Live rows only; the model's scope excludes soft deletes.
+                    $clashes = CourseFeeAssignment::query()
+                        ->where('course_id', $this->input('course_id'))
+                        ->where('curriculum_id', $this->input('curriculum_id'))
+                        ->where('year_no', $this->input('year_no'))
+                        ->where('fee_structure_id', $this->input('fee_structure_id'))
+                        ->where('span', $otherSpan)
+                        ->exists();
+
+                    if ($clashes) {
+                        $fail(
+                            $this->input('span') === FeeSpan::Session->value
+                                ? 'This fee structure already charges this course, curriculum and year as a per-year fee; charging it per session as well would double-charge students.'
+                                : 'This fee structure already charges this course, curriculum and year per session; charging it as a per-year fee as well would double-charge students.'
+                        );
+                    }
+                },
             ],
             'span' => ['required', 'string', Rule::enum(FeeSpan::class)],
             'year_no' => [

@@ -319,11 +319,12 @@ test('a slot charges under only one live assignment', function () {
         ->postJson('/api/course-fee-assignments', [...$payload, 'session_no' => 2])
         ->assertCreated();
 
-    // A per-year fee covers its whole year, so it coexists with the
-    // session-specific fees of that year.
+    // A per-year fee of another structure covers its whole year and
+    // coexists with the session-specific fees of that year.
     $this->withToken($token)
         ->postJson('/api/course-fee-assignments', [
             ...$payload,
+            'fee_structure_id' => FeeStructure::factory()->create()->id,
             'span' => 'year',
             'session_no' => null,
         ])
@@ -333,6 +334,139 @@ test('a slot charges under only one live assignment', function () {
     $this->withToken($token)
         ->postJson('/api/course-fee-assignments', [...$payload, 'course_id' => $otherCourse->id])
         ->assertCreated();
+});
+
+test('a structure may not charge the same year both per year and per session', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+    $otherStructure = FeeStructure::factory()->create();
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    $sessionPayload = [
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $structure->id,
+        'span' => 'session',
+        'year_no' => 1,
+        'session_no' => 1,
+    ];
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            ...$sessionPayload,
+            'span' => 'year',
+            'session_no' => null,
+        ])
+        ->assertCreated();
+
+    // The same structure charging per session on top of its year fee
+    // would charge the student twice in that session.
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', $sessionPayload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['fee_structure_id']);
+
+    // Another structure may still charge the same year per session.
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            ...$sessionPayload,
+            'fee_structure_id' => $otherStructure->id,
+        ])
+        ->assertCreated();
+
+    // Repeating the same structure across the year's sessions is the
+    // point of per-session fees — here for the session-charged one.
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            ...$sessionPayload,
+            'fee_structure_id' => $otherStructure->id,
+            'session_no' => 2,
+        ])
+        ->assertCreated();
+});
+
+test('a per-year fee is refused while the structure already charges per session', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'session',
+            'year_no' => 1,
+            'session_no' => 1,
+        ])
+        ->assertCreated();
+
+    $this->withToken($token)
+        ->postJson('/api/course-fee-assignments', [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'year',
+            'year_no' => 1,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['fee_structure_id']);
+});
+
+test('an update may switch its own span but not onto a structures opposite span', function () {
+    $course = Course::factory()->create();
+    $curriculum = Curriculum::factory()->create();
+    $structure = FeeStructure::factory()->create();
+    $otherStructure = FeeStructure::factory()->create();
+    $token = courseFeeAssignmentsAccessTokenFor(User::factory()->create());
+
+    $annual = CourseFeeAssignment::factory()->create([
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $structure->id,
+        'span' => FeeSpan::Year,
+        'year_no' => 1,
+        'session_no' => null,
+    ]);
+    $termly = CourseFeeAssignment::factory()->create([
+        'course_id' => $course->id,
+        'curriculum_id' => $curriculum->id,
+        'fee_structure_id' => $otherStructure->id,
+        'span' => FeeSpan::Session,
+        'year_no' => 1,
+        'session_no' => 1,
+    ]);
+
+    // Moving onto a structure that already charges this year as a year
+    // fee is refused — the session slot itself is free, so the clash is
+    // the opposite-span coverage, not the slot.
+    $this->withToken($token)
+        ->putJson('/api/course-fee-assignments/'.$termly->id, [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'session',
+            'year_no' => 1,
+            'session_no' => 2,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['fee_structure_id']);
+
+    // Switching its own span is not a clash with itself.
+    $this->withToken($token)
+        ->putJson('/api/course-fee-assignments/'.$annual->id, [
+            'course_id' => $course->id,
+            'curriculum_id' => $curriculum->id,
+            'fee_structure_id' => $structure->id,
+            'span' => 'session',
+            'year_no' => 1,
+            'session_no' => 3,
+        ])
+        ->assertOk()
+        ->assertJsonPath('course_fee_assignment.span', 'session')
+        ->assertJsonPath('course_fee_assignment.session_no', 3);
 });
 
 test('an assignment can be corrected, stamped with the updating user', function () {

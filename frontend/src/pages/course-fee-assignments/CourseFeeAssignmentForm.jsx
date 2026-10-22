@@ -192,9 +192,9 @@ export default function CourseFeeAssignmentForm() {
           <CardDescription>
             Choose the course + curriculum pair, the year of study (and
             session, when charging per session), and the fee structure it
-            charges. Each slot may charge under only one assignment, and the
-            span sets whether the structure&rsquo;s total repeats per session
-            or per year.
+            charges. Each slot charges under only one assignment, and a
+            structure may cover a given year either per session or as a
+            whole — never both.
           </CardDescription>
         </CardHeader>
 
