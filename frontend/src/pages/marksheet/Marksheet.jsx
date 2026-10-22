@@ -326,7 +326,8 @@ export default function Marksheet() {
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                The sheet lists only students who registered the unit for this session.
+                The sheet lists students who registered the unit and have at least one mark
+                recorded.
               </p>
             </FormField>
           </div>
@@ -336,7 +337,8 @@ export default function Marksheet() {
           {sheet &&
             (sheet.rows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No student has registered {sheet.unit?.code ?? 'this unit'} for this session yet.
+                No student has a recorded mark for {sheet.unit?.code ?? 'this unit'} in this
+                session yet.
               </p>
             ) : (
               <>

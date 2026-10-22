@@ -374,6 +374,7 @@ test('the marks sheet lists registered students with papers and averages', funct
 
 test('the marks sheet only lists students registered for the session', function () {
     $setup = unitGradesRegisteredStudent();
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Theory, 1, 55);
 
     // Registered under another session only: the database would refuse
     // marks for them here anyway (the composite foreign key).
@@ -392,6 +393,34 @@ test('the marks sheet only lists students registered for the session', function 
         ->assertOk()
         ->assertJsonCount(1, 'rows')
         ->assertJsonPath('rows.0.student_id', $setup['profile']->id);
+});
+
+test('the marks sheet skips students without any recorded mark', function () {
+    $setup = unitGradesRegisteredStudent();
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Practical, 3, 45);
+
+    // Registered alongside, but not graded at all: no row on the sheet.
+    $ungraded = StudentProfile::factory()->create();
+    UnitRegistration::factory()->create([
+        'academic_session_id' => $setup['session']->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'student_id' => $ungraded->id,
+    ]);
+
+    $this->withToken($setup['token'])
+        ->getJson("/api/unit-grades/sheet?academic_session_id={$setup['session']->id}&course_unit_id={$setup['courseUnit']->id}")
+        ->assertOk()
+        ->assertJsonCount(1, 'rows')
+        ->assertJsonPath('rows.0.student_id', $setup['profile']->id)
+        ->assertJsonPath('rows.0.practical.2', 45);
+
+    // Remove the only mark: the whole class drops off the sheet.
+    UnitGrade::query()->delete();
+
+    $this->withToken($setup['token'])
+        ->getJson("/api/unit-grades/sheet?academic_session_id={$setup['session']->id}&course_unit_id={$setup['courseUnit']->id}")
+        ->assertOk()
+        ->assertJsonCount(0, 'rows');
 });
 
 test('the marks sheet requires a course unit', function () {

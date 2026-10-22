@@ -129,9 +129,10 @@ class UnitGradeController extends Controller
 
     /**
      * The marks sheet for one session and course unit: every student who
-     * registered it with their theory and practical papers laid out per
-     * exam slot, plus each type's average. Unmarked slots stay null so
-     * the sheet shows what is still missing at a glance.
+     * registered it and has at least one mark, with their theory and
+     * practical papers laid out per exam slot plus each type's average.
+     * Unmarked slots stay null so the sheet shows what is still missing
+     * at a glance.
      */
     public function sheet(Request $request): JsonResponse
     {
@@ -194,9 +195,11 @@ class UnitGradeController extends Controller
     }
 
     /**
-     * Every student registered for the unit in the session, with their
-     * papers slotted per exam number and each type's average. Shared by
-     * the on-screen sheet and the file export so both always agree.
+     * Every student registered for the unit in the session who has at
+     * least one recorded mark, with their papers slotted per exam number
+     * and each type's average — a registered-but-ungraded student is not
+     * on the sheet yet. Shared by the on-screen sheet and the file
+     * export so both always agree.
      *
      * @return Collection<int, array{student_id: int, admission_no: ?string, name: ?string, theory: array<int, float|null>, theory_average: ?float, practical: array<int, float|null>, practical_average: ?float}>
      */
@@ -215,32 +218,34 @@ class UnitGradeController extends Controller
             ->get(['student_id', 'exam_type', 'exam_no', 'mark'])
             ->groupBy('student_id');
 
-        return $registrations->map(function (UnitRegistration $registration) use ($grades): array {
-            $theory = [null, null, null];
-            $practical = [null, null, null];
+        return $registrations
+            ->filter(fn (UnitRegistration $registration): bool => $grades->has($registration->student_id))
+            ->map(function (UnitRegistration $registration) use ($grades): array {
+                $theory = [null, null, null];
+                $practical = [null, null, null];
 
-            foreach ($grades->get($registration->student_id, collect()) as $grade) {
-                $index = $grade->exam_no - 1;
+                foreach ($grades->get($registration->student_id, collect()) as $grade) {
+                    $index = $grade->exam_no - 1;
 
-                if ($grade->exam_type === UnitExamType::Theory) {
-                    $theory[$index] = (float) $grade->mark;
-                } else {
-                    $practical[$index] = (float) $grade->mark;
+                    if ($grade->exam_type === UnitExamType::Theory) {
+                        $theory[$index] = (float) $grade->mark;
+                    } else {
+                        $practical[$index] = (float) $grade->mark;
+                    }
                 }
-            }
 
-            $student = $this->studentPayload($registration->student);
+                $student = $this->studentPayload($registration->student);
 
-            return [
-                'student_id' => $registration->student_id,
-                'admission_no' => $student['admission_no'] ?? null,
-                'name' => $student['name'] ?? null,
-                'theory' => $theory,
-                'theory_average' => $this->slotAverage($theory),
-                'practical' => $practical,
-                'practical_average' => $this->slotAverage($practical),
-            ];
-        })->values();
+                return [
+                    'student_id' => $registration->student_id,
+                    'admission_no' => $student['admission_no'] ?? null,
+                    'name' => $student['name'] ?? null,
+                    'theory' => $theory,
+                    'theory_average' => $this->slotAverage($theory),
+                    'practical' => $practical,
+                    'practical_average' => $this->slotAverage($practical),
+                ];
+            })->values();
     }
 
     /**
