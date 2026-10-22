@@ -11,19 +11,26 @@ use App\Models\StudentProfile;
 use App\Models\UnitGrade;
 use App\Models\UnitRegistration;
 use App\Models\User;
+use App\Services\Exports\MarksheetExporter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UnitGradeController extends Controller
 {
+    public function __construct(private readonly MarksheetExporter $exporter) {}
+
     /**
      * The units grading can act on for one academic session: every unit
      * at least one student registered for it, searchable by code or
-     * name. The session defaults to the running one, so the console's
-     * first two picks — session, then unit — resolve from this alone.
+     * name. The session defaults to the running one. Each row carries
+     * its course and curriculum too — the marksheet's pickers cascade
+     * session → course → curriculum → unit off this one list.
      */
     public function units(Request $request): JsonResponse
     {
@@ -47,6 +54,8 @@ class UnitGradeController extends Controller
 
         $units = CourseUnit::query()
             ->join('units', 'units.id', '=', 'course_units.unit_id')
+            ->join('courses', 'courses.id', '=', 'course_units.course_id')
+            ->join('curricula', 'curricula.id', '=', 'course_units.curriculum_id')
             ->whereNull('units.deleted_at')
             ->whereIn('course_units.id', $registeredIds)
             ->when($search !== '', function (Builder $query) use ($search): void {
@@ -57,6 +66,8 @@ class UnitGradeController extends Controller
             })
             ->select('course_units.id')
             ->addSelect('units.code', 'units.name')
+            ->addSelect('course_units.course_id', 'course_units.curriculum_id')
+            ->addSelect('courses.name as course_name', 'curricula.name as curriculum_name')
             ->orderBy('units.code')
             ->orderBy('units.name')
             ->limit(50)
@@ -65,6 +76,10 @@ class UnitGradeController extends Controller
                 'course_unit_id' => $link->id,
                 'code' => $link->code,
                 'name' => $link->name,
+                'course_id' => $link->course_id,
+                'course' => $link->course_name,
+                'curriculum_id' => $link->curriculum_id,
+                'curriculum' => $link->curriculum_name,
             ])
             ->values();
 
@@ -135,6 +150,58 @@ class UnitGradeController extends Controller
             ->with('unit:id,code,name')
             ->findOrFail($data['course_unit_id']);
 
+        return response()->json([
+            'session' => $this->sessionPayload($session),
+            'unit' => [
+                'course_unit_id' => $courseUnit->id,
+                'code' => $courseUnit->unit?->code,
+                'name' => $courseUnit->unit?->name,
+            ],
+            'rows' => $this->sheetRows($session, $courseUnit),
+        ]);
+    }
+
+    /**
+     * Download the same marks sheet as a file: the full class list for
+     * the filters, never paginated, as csv, xlsx or pdf.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $data = $request->validate([
+            'academic_session_id' => ['sometimes', 'integer', 'exists:academic_sessions,id'],
+            'course_unit_id' => ['required', 'integer', 'exists:course_units,id'],
+            'format' => ['required', Rule::in(['csv', 'xlsx', 'pdf'])],
+        ]);
+
+        $session = $this->resolveSession($data);
+
+        if ($session === null) {
+            throw ValidationException::withMessages([
+                'academic_session_id' => 'There is no active academic session to export.',
+            ]);
+        }
+
+        $courseUnit = CourseUnit::query()
+            ->with(['unit:id,code,name', 'course:id,name', 'curriculum:id,name'])
+            ->findOrFail($data['course_unit_id']);
+
+        return $this->exporter->download(
+            $data['format'],
+            $session,
+            $courseUnit,
+            $this->sheetRows($session, $courseUnit),
+        );
+    }
+
+    /**
+     * Every student registered for the unit in the session, with their
+     * papers slotted per exam number and each type's average. Shared by
+     * the on-screen sheet and the file export so both always agree.
+     *
+     * @return Collection<int, array{student_id: int, admission_no: ?string, name: ?string, theory: array<int, float|null>, theory_average: ?float, practical: array<int, float|null>, practical_average: ?float}>
+     */
+    private function sheetRows(AcademicSession $session, CourseUnit $courseUnit): Collection
+    {
         $registrations = UnitRegistration::query()
             ->where('academic_session_id', $session->id)
             ->where('course_unit_id', $courseUnit->id)
@@ -148,7 +215,7 @@ class UnitGradeController extends Controller
             ->get(['student_id', 'exam_type', 'exam_no', 'mark'])
             ->groupBy('student_id');
 
-        $rows = $registrations->map(function (UnitRegistration $registration) use ($grades): array {
+        return $registrations->map(function (UnitRegistration $registration) use ($grades): array {
             $theory = [null, null, null];
             $practical = [null, null, null];
 
@@ -174,16 +241,6 @@ class UnitGradeController extends Controller
                 'practical_average' => $this->slotAverage($practical),
             ];
         })->values();
-
-        return response()->json([
-            'session' => $this->sessionPayload($session),
-            'unit' => [
-                'course_unit_id' => $courseUnit->id,
-                'code' => $courseUnit->unit?->code,
-                'name' => $courseUnit->unit?->name,
-            ],
-            'rows' => $rows,
-        ]);
     }
 
     /**

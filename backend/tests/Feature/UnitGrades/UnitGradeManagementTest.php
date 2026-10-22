@@ -11,6 +11,7 @@ use App\Models\UnitGrade;
 use App\Models\UnitRegistration;
 use App\Models\User;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 function unitGradesAccessTokenFor(User $user): string
@@ -64,6 +65,46 @@ function unitGradesRegisteredStudent(): array
 }
 
 /**
+ * A two-student class with marks, for export tests: every format must
+ * carry both students and the computed averages.
+ *
+ * @return array{token: string, session: AcademicSession, courseUnit: CourseUnit}
+ */
+function unitGradesMarksheetClass(): array
+{
+    $setup = unitGradesRegisteredStudent();
+
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Theory, 1, 58);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Theory, 2, 66);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Theory, 3, 72.5);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Practical, 1, 80);
+    unitGradesAward($setup, $setup['courseUnit'], UnitExamType::Practical, 2, 74);
+
+    $mateUser = User::factory()->create(['role' => Role::Student, 'login_id' => 'ADM-2026-098']);
+    $mate = StudentProfile::factory()->create(['user_id' => $mateUser->id]);
+    UnitRegistration::factory()->create([
+        'academic_session_id' => $setup['session']->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'student_id' => $mate->id,
+    ]);
+
+    UnitGrade::factory()->create([
+        'academic_session_id' => $setup['session']->id,
+        'student_id' => $mate->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'exam_type' => UnitExamType::Theory,
+        'exam_no' => 1,
+        'mark' => 90,
+    ]);
+
+    return [
+        'token' => $setup['token'],
+        'session' => $setup['session'],
+        'courseUnit' => $setup['courseUnit'],
+    ];
+}
+
+/**
  * Record one mark directly — the API can only save whole form states.
  * Marks hang off the registered course-unit link, not the bare unit.
  */
@@ -83,6 +124,7 @@ test('the unit grade endpoints require an access token', function () {
     $this->getJson('/api/unit-grades/units')->assertUnauthorized();
     $this->getJson('/api/unit-grades/students?course_unit_id=1')->assertUnauthorized();
     $this->getJson('/api/unit-grades/sheet?course_unit_id=1')->assertUnauthorized();
+    $this->getJson('/api/unit-grades/sheet/export?course_unit_id=1&format=csv')->assertUnauthorized();
     $this->getJson('/api/unit-grades?student_id=1')->assertUnauthorized();
     $this->putJson('/api/unit-grades', [])->assertUnauthorized();
 });
@@ -93,6 +135,7 @@ test('the unit grade endpoints refuse students and finance', function (Role $rol
     $this->withToken($token)->getJson('/api/unit-grades/units')->assertForbidden();
     $this->withToken($token)->getJson('/api/unit-grades/students?course_unit_id=1')->assertForbidden();
     $this->withToken($token)->getJson('/api/unit-grades/sheet?course_unit_id=1')->assertForbidden();
+    $this->withToken($token)->getJson('/api/unit-grades/sheet/export?course_unit_id=1&format=csv')->assertForbidden();
     $this->withToken($token)->getJson('/api/unit-grades?student_id=1')->assertForbidden();
     $this->withToken($token)->putJson('/api/unit-grades', [])->assertForbidden();
 })->with([
@@ -182,7 +225,13 @@ test('the unit picker lists only units registered for the session', function () 
         ->assertJsonCount(1, 'units')
         ->assertJsonPath('units.0.course_unit_id', $setup['courseUnit']->id)
         ->assertJsonPath('units.0.code', 'U100')
-        ->assertJsonPath('units.0.name', 'Basics');
+        ->assertJsonPath('units.0.name', 'Basics')
+        // Every row carries its course + curriculum so the marksheet's
+        // pickers can cascade off this one list.
+        ->assertJsonPath('units.0.course_id', $setup['courseUnit']->course_id)
+        ->assertJsonPath('units.0.course', $setup['courseUnit']->course->name)
+        ->assertJsonPath('units.0.curriculum_id', $setup['courseUnit']->curriculum_id)
+        ->assertJsonPath('units.0.curriculum', $setup['courseUnit']->curriculum->name);
 
     // Without an explicit session the picker falls back to the active one.
     $this->withToken($setup['token'])
@@ -352,6 +401,109 @@ test('the marks sheet requires a course unit', function () {
         ->getJson('/api/unit-grades/sheet')
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['course_unit_id']);
+});
+
+test('the csv export streams the whole class with a matching filename', function () {
+    $setup = unitGradesMarksheetClass();
+    $query = http_build_query([
+        'academic_session_id' => $setup['session']->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'format' => 'csv',
+    ]);
+
+    $response = $this->withToken($setup['token'])
+        ->get("/api/unit-grades/sheet/export?{$query}")
+        ->assertOk()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8')
+        ->assertDownload('marksheet-u100-term-1-2026-2027.csv');
+
+    $csv = $response->streamedContent();
+
+    // Header row (fputcsv quotes labels containing spaces), then every
+    // student — never a page of them.
+    expect($csv)->toContain('"ADM NO."')
+        ->toContain('"Theory Average"')
+        ->toContain('ADM-2026-099')
+        ->toContain('ADM-2026-098')
+        ->toContain('65.5');
+});
+
+test('the xlsx export is a real spreadsheet file', function () {
+    $setup = unitGradesMarksheetClass();
+    $query = http_build_query([
+        'academic_session_id' => $setup['session']->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'format' => 'xlsx',
+    ]);
+
+    $response = $this->withToken($setup['token'])
+        ->get("/api/unit-grades/sheet/export?{$query}")
+        ->assertOk()
+        ->assertHeader(
+            'content-type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        ->assertDownload('marksheet-u100-term-1-2026-2027.xlsx');
+
+    $xlsx = $response->streamedContent();
+
+    // A zip container with the workbook sheet inside.
+    expect(Str::startsWith($xlsx, 'PK'))->toBeTrue();
+
+    $zipPath = tempnam(sys_get_temp_dir(), 'marksheet-test-');
+    file_put_contents($zipPath, $xlsx);
+
+    $zip = new ZipArchive;
+    expect($zip->open($zipPath))->toBeTrue();
+
+    $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+    $zip->close();
+    unlink($zipPath);
+
+    expect($sheet)
+        ->toContain('ADM-2026-099')
+        ->toContain('Theory Average');
+});
+
+test('the pdf export produces a document with the class in it', function () {
+    $setup = unitGradesMarksheetClass();
+    $query = http_build_query([
+        'academic_session_id' => $setup['session']->id,
+        'course_unit_id' => $setup['courseUnit']->id,
+        'format' => 'pdf',
+    ]);
+
+    $response = $this->withToken($setup['token'])
+        ->get("/api/unit-grades/sheet/export?{$query}")
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf')
+        ->assertDownload('marksheet-u100-term-1-2026-2027.pdf');
+
+    $pdf = $response->streamedContent();
+
+    expect(Str::startsWith($pdf, '%PDF-1.4'))->toBeTrue();
+    expect($pdf)->toContain('%%EOF')
+        ->toContain('ADM-2026-099')
+        ->toContain('MARKSHEET');
+});
+
+test('the export refuses an unknown format', function () {
+    $setup = unitGradesRegisteredStudent();
+
+    $this->withToken($setup['token'])
+        ->getJson("/api/unit-grades/sheet/export?course_unit_id={$setup['courseUnit']->id}&format=docx")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['format']);
+});
+
+test('the export refuses when there is no session to export', function () {
+    $setup = unitGradesRegisteredStudent();
+    AcademicSession::query()->update(['is_active' => false]);
+
+    $this->withToken($setup['token'])
+        ->getJson("/api/unit-grades/sheet/export?course_unit_id={$setup['courseUnit']->id}&format=csv")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['academic_session_id']);
 });
 
 test('a trainer can award marks with audit stamps', function () {

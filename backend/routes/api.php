@@ -187,6 +187,10 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('role:admin,trainer')
         ->middleware('throttle:api')
         ->name('unit-grades.units');
+    Route::get('unit-grades/sheet/export', [UnitGradeController::class, 'export'])
+        ->middleware('role:admin,trainer')
+        ->middleware('throttle:api')
+        ->name('unit-grades.sheet.export');
     Route::get('unit-grades/students', [UnitGradeController::class, 'students'])
         ->middleware('role:admin,trainer')
         ->middleware('throttle:api')
