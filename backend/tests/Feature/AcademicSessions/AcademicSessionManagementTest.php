@@ -16,6 +16,61 @@ test('academic session endpoints require an access token', function () {
     $this->getJson('/api/academic-sessions')->assertUnauthorized();
     $this->postJson('/api/academic-sessions', ['name' => 'Term 1'])
         ->assertUnauthorized();
+    $this->getJson('/api/academic-sessions/options')->assertUnauthorized();
+});
+
+test('the session picker is readable without the academic-sessions view permission', function () {
+    $year = AcademicYear::factory()->create(['name' => '2026/2027']);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'is_active' => true,
+    ]);
+
+    $student = User::factory()->student()->create();
+
+    $this->withToken(academicSessionsAccessTokenFor($student))
+        ->getJson('/api/academic-sessions/options')
+        ->assertOk()
+        ->assertJsonCount(1, 'academic_sessions')
+        ->assertJsonPath('academic_sessions.0.name', 'Term 1 2026')
+        ->assertJsonPath('academic_sessions.0.academic_year_name', '2026/2027');
+
+    // The management screen behind the picker stays gated on its verb.
+    $this->withToken(academicSessionsAccessTokenFor($student))
+        ->getJson('/api/academic-sessions')
+        ->assertForbidden();
+});
+
+test('the session picker narrows by active flag and name search', function () {
+    $year = AcademicYear::factory()->create();
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 1 2026',
+        'start_date' => '2026-09-01',
+        'is_active' => true,
+    ]);
+    AcademicSession::factory()->create([
+        'academic_year_id' => $year->id,
+        'name' => 'Term 2 2026',
+        'start_date' => '2027-01-15',
+        'is_active' => false,
+    ]);
+
+    $token = academicSessionsAccessTokenFor(User::factory()->student()->create());
+
+    $this->withToken($token)
+        ->getJson('/api/academic-sessions/options?is_active=1')
+        ->assertOk()
+        ->assertJsonCount(1, 'academic_sessions')
+        ->assertJsonPath('academic_sessions.0.name', 'Term 1 2026');
+
+    $this->withToken($token)
+        ->getJson('/api/academic-sessions/options?search=Term%202')
+        ->assertOk()
+        ->assertJsonCount(1, 'academic_sessions')
+        ->assertJsonPath('academic_sessions.0.name', 'Term 2 2026');
 });
 
 test('academic sessions are listed newest start date first with their year name', function () {

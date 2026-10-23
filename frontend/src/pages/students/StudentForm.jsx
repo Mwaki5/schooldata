@@ -658,9 +658,8 @@ export default function StudentForm() {
                     }
                     fetchOptions={(query, signal) =>
                       api
-                        .get('/academic-sessions', {
+                        .get('/academic-sessions/options', {
                           params: {
-                            per_page: 100,
                             ...(query ? { search: query } : {}),
                           },
                           signal,

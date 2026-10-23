@@ -41,11 +41,12 @@ export default function Marksheet() {
   const [exportOpen, setExportOpen] = useState(false)
   const exportRef = useRef(null)
 
-  // The session list only ever holds a couple of rows per year, so one
-  // unfiltered page is enough; the active session is preselected.
+  // The session list only ever holds a couple of rows per year; the
+  // picker endpoint serves them all, and the active session is
+  // preselected.
   useEffect(() => {
     api
-      .get('/academic-sessions', { params: { per_page: 100 } })
+      .get('/academic-sessions/options')
       .then(({ data }) => {
         const list = data.academic_sessions ?? []
         setSessions(list)

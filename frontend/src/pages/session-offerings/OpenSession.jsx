@@ -160,12 +160,9 @@ export default function OpenSession() {
     let active = true
 
     api
-      .get('/academic-sessions', {
+      .get('/academic-sessions/options', {
         params: {
-          per_page: 100,
           is_active: 1,
-          sort: 'start_date',
-          order: 'desc',
         },
       })
       .then(({ data: payload }) => {

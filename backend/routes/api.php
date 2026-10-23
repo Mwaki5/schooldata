@@ -60,15 +60,17 @@ Route::get('/user', function (Request $request): JsonResponse {
 | Authenticated API routes
 |--------------------------------------------------------------------------
 |
-| Every route below is tagged with its own `permission:` middleware so each
-| endpoint carries the exact ability that decides access — permissions,
-| never role names. Permissions are fine-grained per resource and named
-| after the verb they gate: `view` reads (index, show), `create` stores,
+| Nearly every route below is tagged with its own `permission:`
+| middleware so each endpoint carries the exact ability that decides
+| access — permissions, never role names. The two self-service routes
+| noted inline (own password, the session picker) deliberately carry
+| none. Permissions are fine-grained per resource and named after the
+| verb they gate: `view` reads (index, show), `create` stores,
 | `update` edits, `delete` destroys. A resource without a given route
-| simply has no permission for it, and roles bundle whichever permissions
-| a user needs. With its own `throttle:` tag for rate limiting. There is
-| deliberately no shared permission group — edit a single line to widen
-| a single endpoint.
+| simply has no permission for it, and roles bundle whichever
+| permissions a user needs. With its own `throttle:` tag for rate
+| limiting. There is deliberately no shared permission group — edit a
+| single line to widen a single endpoint.
 |
 */
 Route::middleware(['auth:api', 'access.type'])->group(function () {
@@ -77,6 +79,16 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
     Route::match(['PUT', 'PATCH'], 'profile/password', [PasswordUpdateController::class, 'update'])
         ->middleware('throttle:api')
         ->name('profile.password.update');
+
+    // The academic-session picker every "pick a session" dropdown reads,
+    // wherever that dropdown sits in the UI. Session names are calendar
+    // reference data, so like the password route it carries no permission
+    // gate — `academic-sessions.view` guards the management screen. Kept
+    // above the {academicSession} routes so the static segment is matched
+    // before the wildcard can bind it as a model id.
+    Route::get('academic-sessions/options', [AcademicSessionController::class, 'options'])
+        ->middleware('throttle:api')
+        ->name('academic-sessions.options');
 
     // The student's own portal: dashboard, units, session registration
     // and marks for the signed-in account only — one permission covers

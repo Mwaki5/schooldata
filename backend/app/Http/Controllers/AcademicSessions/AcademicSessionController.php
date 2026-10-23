@@ -58,6 +58,37 @@ class AcademicSessionController extends Controller
     }
 
     /**
+     * The academic-session picker: any signed-in console may read it,
+     * because "pick a session" is where permission-scoped pages start
+     * (grading console, marksheet, the enrolment and event forms) and
+     * their own permissions cannot apply until that first choice is
+     * made. `academic-sessions.view` guards the management screen, not
+     * the calendar, so this route carries no permission of its own.
+     */
+    public function options(Request $request): JsonResponse
+    {
+        $filters = $request->validate([
+            'is_active' => ['nullable', 'boolean'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $sessions = AcademicSession::query()
+            ->with('academicYear:id,name')
+            ->when(
+                array_key_exists('is_active', $filters) && $filters['is_active'] !== null,
+                fn ($query) => $query->where('is_active', (bool) $filters['is_active']),
+            )
+            ->when($filters['search'] ?? '', fn ($query, $term) => $query->where('name', 'like', "%{$term}%"))
+            ->orderBy('start_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return response()->json([
+            'academic_sessions' => AcademicSessionResource::collection($sessions),
+        ]);
+    }
+
+    /**
      * Create a new academic session, stamping the creating user. Only one
      * session may be active at a time, so activating this one retires the
      * others.

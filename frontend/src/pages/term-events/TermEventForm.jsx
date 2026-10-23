@@ -182,9 +182,8 @@ export default function TermEventForm() {
                   }
                   fetchOptions={(query, signal) =>
                     api
-                      .get('/academic-sessions', {
+                      .get('/academic-sessions/options', {
                         params: {
-                          per_page: 100,
                           is_active: 1,
                           ...(query ? { search: query } : {}),
                         },
