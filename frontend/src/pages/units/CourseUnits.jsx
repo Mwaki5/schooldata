@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { UnitTypeBadge } from '@/components/unit-type-badge'
 import api, { loadErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -31,6 +32,7 @@ function StatusBadge({ active }) {
  * unit; the unit itself stays in the catalogue.
  */
 export default function CourseUnits() {
+  const { can } = useAuth()
   const { courseId } = useParams()
 
   const [course, setCourse] = useState(null)
@@ -295,41 +297,47 @@ export default function CourseUnits() {
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1">
-                            <Link
-                              to={`/course-units/${link.id}/edit`}
-                              className={buttonVariants({
-                                variant: 'ghost',
-                                size: 'sm',
-                              })}
-                              title="Edit course unit"
-                              aria-label={`Edit ${link.unit?.code ?? 'unit'} in ${link.curriculum?.name ?? 'curriculum'}`}
-                            >
-                              <Pencil aria-hidden="true" />
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={busyId === link.id}
-                              title={
-                                link.is_active
-                                  ? 'Deactivate unit'
-                                  : 'Activate unit'
-                              }
-                              aria-label={`${link.is_active ? 'Deactivate' : 'Activate'} ${link.unit?.code ?? 'unit'} in ${link.curriculum?.name ?? 'curriculum'}`}
-                              onClick={() => handleToggleActive(link)}
-                            >
-                              <Power aria-hidden="true" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={busyId === link.id}
-                              title="Unlink from course"
-                              aria-label={`Unlink ${link.unit?.code ?? 'unit'} from ${link.curriculum?.name ?? 'curriculum'}`}
-                              onClick={() => handleDelete(link)}
-                            >
-                              <Trash2 aria-hidden="true" />
-                            </Button>
+                            {can('course-units.update') && (
+                              <Link
+                                to={`/course-units/${link.id}/edit`}
+                                className={buttonVariants({
+                                  variant: 'ghost',
+                                  size: 'sm',
+                                })}
+                                title="Edit course unit"
+                                aria-label={`Edit ${link.unit?.code ?? 'unit'} in ${link.curriculum?.name ?? 'curriculum'}`}
+                              >
+                                <Pencil aria-hidden="true" />
+                              </Link>
+                            )}
+                            {can('course-units.update') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={busyId === link.id}
+                                title={
+                                  link.is_active
+                                    ? 'Deactivate unit'
+                                    : 'Activate unit'
+                                }
+                                aria-label={`${link.is_active ? 'Deactivate' : 'Activate'} ${link.unit?.code ?? 'unit'} in ${link.curriculum?.name ?? 'curriculum'}`}
+                                onClick={() => handleToggleActive(link)}
+                              >
+                                <Power aria-hidden="true" />
+                              </Button>
+                            )}
+                            {can('course-units.delete') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={busyId === link.id}
+                                title="Unlink from course"
+                                aria-label={`Unlink ${link.unit?.code ?? 'unit'} from ${link.curriculum?.name ?? 'curriculum'}`}
+                                onClick={() => handleDelete(link)}
+                              >
+                                <Trash2 aria-hidden="true" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

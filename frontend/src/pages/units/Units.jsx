@@ -10,8 +10,10 @@ import { ListSearch } from '@/components/list-search'
 import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 
 export default function Units() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
   const [courseFilter, setCourseFilter] = useState('')
   const [curriculumFilter, setCurriculumFilter] = useState('')
@@ -119,17 +121,21 @@ export default function Units() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            to="/course-units/create"
-            className={buttonVariants({ variant: 'outline' })}
-          >
-            <BookOpen aria-hidden="true" />
-            Link to Course
-          </Link>
-          <Link to="/units/create" className={buttonVariants()}>
-            <Plus aria-hidden="true" />
-            New Unit
-          </Link>
+          {can('course-units.create') && (
+            <Link
+              to="/course-units/create"
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              <BookOpen aria-hidden="true" />
+              Link to Course
+            </Link>
+          )}
+          {can('units.create') && (
+            <Link to="/units/create" className={buttonVariants()}>
+              <Plus aria-hidden="true" />
+              New Unit
+            </Link>
+          )}
         </div>
       </div>
 
@@ -264,17 +270,19 @@ export default function Units() {
                             >
                               <Eye aria-hidden="true" />
                             </Link>
-                            <Link
-                              to={`/units/${unit.id}/edit`}
-                              className={buttonVariants({
-                                variant: 'ghost',
-                                size: 'sm',
-                              })}
-                              title="Edit unit"
-                              aria-label={`Edit unit ${unit.name}`}
-                            >
-                              <Pencil aria-hidden="true" />
-                            </Link>
+                            {can('units.update') && (
+                              <Link
+                                to={`/units/${unit.id}/edit`}
+                                className={buttonVariants({
+                                  variant: 'ghost',
+                                  size: 'sm',
+                                })}
+                                title="Edit unit"
+                                aria-label={`Edit unit ${unit.name}`}
+                              >
+                                <Pencil aria-hidden="true" />
+                              </Link>
+                            )}
                             <Link
                               to={`/course-units?unit_id=${unit.id}`}
                               className={buttonVariants({
@@ -286,16 +294,18 @@ export default function Units() {
                             >
                               <BookOpen aria-hidden="true" />
                             </Link>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={deletingId === unit.id}
-                              title="Delete unit"
-                              aria-label={`Delete unit ${unit.name}`}
-                              onClick={() => handleDelete(unit)}
-                            >
-                              <Trash2 aria-hidden="true" />
-                            </Button>
+                            {can('units.delete') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={deletingId === unit.id}
+                                title="Delete unit"
+                                aria-label={`Delete unit ${unit.name}`}
+                                onClick={() => handleDelete(unit)}
+                              >
+                                <Trash2 aria-hidden="true" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

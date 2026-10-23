@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Select } from '@/components/ui/select'
 import api, { loadErrorMessage } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 
 // The two papers a unit can be graded on; each type has exam numbers 1–3.
 const EXAM_TYPES = [
@@ -25,6 +26,7 @@ function scoreFor(data, type, no) {
 }
 
 export default function UnitGrades() {
+  const { can } = useAuth()
   const [sessions, setSessions] = useState([])
   const [sessionId, setSessionId] = useState(null)
   const [unit, setUnit] = useState(null) // { id, name } — the course-unit link
@@ -319,11 +321,13 @@ export default function UnitGrades() {
 
               <p className="text-xs text-muted-foreground">{scoreHelp}</p>
 
-              <div className="flex justify-end">
-                <Button type="submit" disabled={saving || !consoleData || !canSave}>
-                  {saving ? 'Saving…' : 'Save Mark'}
-                </Button>
-              </div>
+              {can('unit-grades.update') && (
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={saving || !consoleData || !canSave}>
+                    {saving ? 'Saving…' : 'Save Mark'}
+                  </Button>
+                </div>
+              )}
             </form>
           )}
         </CardContent>

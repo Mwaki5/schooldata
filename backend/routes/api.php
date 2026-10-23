@@ -62,11 +62,13 @@ Route::get('/user', function (Request $request): JsonResponse {
 |
 | Every route below is tagged with its own `permission:` middleware so each
 | endpoint carries the exact ability that decides access — permissions,
-| never role names. Roles bundle these permissions and a user may hold
-| several, so granting access is a matter of assigning a role (or a
-| permission) rather than editing routes, and with its own `throttle:` tag
-| for rate limiting. There is deliberately no shared permission group —
-| edit a single line to widen a single endpoint.
+| never role names. Permissions are fine-grained per resource and named
+| after the verb they gate: `view` reads (index, show), `create` stores,
+| `update` edits, `delete` destroys. A resource without a given route
+| simply has no permission for it, and roles bundle whichever permissions
+| a user needs. With its own `throttle:` tag for rate limiting. There is
+| deliberately no shared permission group — edit a single line to widen
+| a single endpoint.
 |
 */
 Route::middleware(['auth:api', 'access.type'])->group(function () {
@@ -109,10 +111,29 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('me.grades');
 
+    // The roles screen reads the catalog and edits what each role may
+    // do; creating and deleting roles goes further, and the admin role
+    // itself is locked server-side.
     Route::get('roles', [RoleController::class, 'index'])
         ->middleware('permission:roles.view')
         ->middleware('throttle:api')
         ->name('roles.index');
+    Route::post('roles', [RoleController::class, 'store'])
+        ->middleware('permission:roles.create')
+        ->middleware('throttle:api')
+        ->name('roles.store');
+    Route::match(['PUT', 'PATCH'], 'roles/{role}/permissions', [RoleController::class, 'updatePermissions'])
+        ->middleware('permission:roles.update')
+        ->middleware('throttle:api')
+        ->name('roles.permissions.update');
+    Route::match(['PUT', 'PATCH'], 'roles/{role}', [RoleController::class, 'update'])
+        ->middleware('permission:roles.update')
+        ->middleware('throttle:api')
+        ->name('roles.update');
+    Route::delete('roles/{role}', [RoleController::class, 'destroy'])
+        ->middleware('permission:roles.delete')
+        ->middleware('throttle:api')
+        ->name('roles.destroy');
 
     Route::get('users', [UserController::class, 'index'])
         ->middleware('permission:users.view')
@@ -124,7 +145,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('departments.index');
     Route::post('departments', [DepartmentController::class, 'store'])
-        ->middleware('permission:departments.manage')
+        ->middleware('permission:departments.create')
         ->middleware('throttle:api')
         ->name('departments.store');
     Route::get('departments/{department}', [DepartmentController::class, 'show'])
@@ -132,11 +153,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('departments.show');
     Route::match(['PUT', 'PATCH'], 'departments/{department}', [DepartmentController::class, 'update'])
-        ->middleware('permission:departments.manage')
+        ->middleware('permission:departments.update')
         ->middleware('throttle:api')
         ->name('departments.update');
     Route::delete('departments/{department}', [DepartmentController::class, 'destroy'])
-        ->middleware('permission:departments.manage')
+        ->middleware('permission:departments.delete')
         ->middleware('throttle:api')
         ->name('departments.destroy');
 
@@ -145,7 +166,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('exam-bodies.index');
     Route::post('exam-bodies', [ExamBodyController::class, 'store'])
-        ->middleware('permission:exam-bodies.manage')
+        ->middleware('permission:exam-bodies.create')
         ->middleware('throttle:api')
         ->name('exam-bodies.store');
     Route::get('exam-bodies/{examBody}', [ExamBodyController::class, 'show'])
@@ -153,11 +174,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('exam-bodies.show');
     Route::match(['PUT', 'PATCH'], 'exam-bodies/{examBody}', [ExamBodyController::class, 'update'])
-        ->middleware('permission:exam-bodies.manage')
+        ->middleware('permission:exam-bodies.update')
         ->middleware('throttle:api')
         ->name('exam-bodies.update');
     Route::delete('exam-bodies/{examBody}', [ExamBodyController::class, 'destroy'])
-        ->middleware('permission:exam-bodies.manage')
+        ->middleware('permission:exam-bodies.delete')
         ->middleware('throttle:api')
         ->name('exam-bodies.destroy');
 
@@ -166,7 +187,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('exam-body-grades.index');
     Route::post('exam-body-grades', [ExamBodyGradeController::class, 'store'])
-        ->middleware('permission:exam-body-grades.manage')
+        ->middleware('permission:exam-body-grades.create')
         ->middleware('throttle:api')
         ->name('exam-body-grades.store');
     Route::get('exam-body-grades/{examBodyGrade}', [ExamBodyGradeController::class, 'show'])
@@ -174,11 +195,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('exam-body-grades.show');
     Route::match(['PUT', 'PATCH'], 'exam-body-grades/{examBodyGrade}', [ExamBodyGradeController::class, 'update'])
-        ->middleware('permission:exam-body-grades.manage')
+        ->middleware('permission:exam-body-grades.update')
         ->middleware('throttle:api')
         ->name('exam-body-grades.update');
     Route::delete('exam-body-grades/{examBodyGrade}', [ExamBodyGradeController::class, 'destroy'])
-        ->middleware('permission:exam-body-grades.manage')
+        ->middleware('permission:exam-body-grades.delete')
         ->middleware('throttle:api')
         ->name('exam-body-grades.destroy');
 
@@ -186,7 +207,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
     // registered units; three of each type fully grade a unit. The
     // console picks run session → unit → student → paper, so the two
     // lookups feed it before the payload endpoint. Reading the console
-    // needs view; awarding marks needs manage.
+    // needs view; saving marks upserts them, so it needs update.
     Route::get('unit-grades/units', [UnitGradeController::class, 'units'])
         ->middleware('permission:unit-grades.view')
         ->middleware('throttle:api')
@@ -208,7 +229,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('unit-grades.index');
     Route::put('unit-grades', [UnitGradeController::class, 'save'])
-        ->middleware('permission:unit-grades.manage')
+        ->middleware('permission:unit-grades.update')
         ->middleware('throttle:api')
         ->name('unit-grades.save');
 
@@ -217,7 +238,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('certification-levels.index');
     Route::post('certification-levels', [CertificationLevelController::class, 'store'])
-        ->middleware('permission:certification-levels.manage')
+        ->middleware('permission:certification-levels.create')
         ->middleware('throttle:api')
         ->name('certification-levels.store');
     Route::get('certification-levels/{certificationLevel}', [CertificationLevelController::class, 'show'])
@@ -225,23 +246,24 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('certification-levels.show');
     Route::match(['PUT', 'PATCH'], 'certification-levels/{certificationLevel}', [CertificationLevelController::class, 'update'])
-        ->middleware('permission:certification-levels.manage')
+        ->middleware('permission:certification-levels.update')
         ->middleware('throttle:api')
         ->name('certification-levels.update');
     Route::delete('certification-levels/{certificationLevel}', [CertificationLevelController::class, 'destroy'])
-        ->middleware('permission:certification-levels.manage')
+        ->middleware('permission:certification-levels.delete')
         ->middleware('throttle:api')
         ->name('certification-levels.destroy');
 
     // Fee structures: the named fee plans the school charges against.
     // The Fees module's first building block; finance shares these with
-    // the admins who set them up.
+    // the admins who set them up. Their nested items follow the same
+    // permission as the parent.
     Route::get('fee-structures', [FeeStructureController::class, 'index'])
         ->middleware('permission:fee-structures.view')
         ->middleware('throttle:api')
         ->name('fee-structures.index');
     Route::post('fee-structures', [FeeStructureController::class, 'store'])
-        ->middleware('permission:fee-structures.manage')
+        ->middleware('permission:fee-structures.create')
         ->middleware('throttle:api')
         ->name('fee-structures.store');
     Route::get('fee-structures/{feeStructure}', [FeeStructureController::class, 'show'])
@@ -249,11 +271,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('fee-structures.show');
     Route::match(['PUT', 'PATCH'], 'fee-structures/{feeStructure}', [FeeStructureController::class, 'update'])
-        ->middleware('permission:fee-structures.manage')
+        ->middleware('permission:fee-structures.update')
         ->middleware('throttle:api')
         ->name('fee-structures.update');
     Route::delete('fee-structures/{feeStructure}', [FeeStructureController::class, 'destroy'])
-        ->middleware('permission:fee-structures.manage')
+        ->middleware('permission:fee-structures.delete')
         ->middleware('throttle:api')
         ->name('fee-structures.destroy');
 
@@ -265,15 +287,15 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('fee-structures.items.index');
     Route::post('fee-structures/{feeStructure}/items', [FeeStructureItemController::class, 'store'])
-        ->middleware('permission:fee-structures.manage')
+        ->middleware('permission:fee-structures.create')
         ->middleware('throttle:api')
         ->name('fee-structures.items.store');
     Route::match(['PUT', 'PATCH'], 'fee-structures/{feeStructure}/items/{feeStructureItem}', [FeeStructureItemController::class, 'update'])
-        ->middleware('permission:fee-structures.manage')
+        ->middleware('permission:fee-structures.update')
         ->middleware('throttle:api')
         ->name('fee-structures.items.update');
     Route::delete('fee-structures/{feeStructure}/items/{feeStructureItem}', [FeeStructureItemController::class, 'destroy'])
-        ->middleware('permission:fee-structures.manage')
+        ->middleware('permission:fee-structures.delete')
         ->middleware('throttle:api')
         ->name('fee-structures.items.destroy');
 
@@ -286,7 +308,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('course-fee-assignments.index');
     Route::post('course-fee-assignments', [CourseFeeAssignmentController::class, 'store'])
-        ->middleware('permission:course-fee-assignments.manage')
+        ->middleware('permission:course-fee-assignments.create')
         ->middleware('throttle:api')
         ->name('course-fee-assignments.store');
     Route::get('course-fee-assignments/{courseFeeAssignment}', [CourseFeeAssignmentController::class, 'show'])
@@ -294,11 +316,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('course-fee-assignments.show');
     Route::match(['PUT', 'PATCH'], 'course-fee-assignments/{courseFeeAssignment}', [CourseFeeAssignmentController::class, 'update'])
-        ->middleware('permission:course-fee-assignments.manage')
+        ->middleware('permission:course-fee-assignments.update')
         ->middleware('throttle:api')
         ->name('course-fee-assignments.update');
     Route::delete('course-fee-assignments/{courseFeeAssignment}', [CourseFeeAssignmentController::class, 'destroy'])
-        ->middleware('permission:course-fee-assignments.manage')
+        ->middleware('permission:course-fee-assignments.delete')
         ->middleware('throttle:api')
         ->name('course-fee-assignments.destroy');
 
@@ -307,7 +329,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('curricula.index');
     Route::post('curricula', [CurriculumController::class, 'store'])
-        ->middleware('permission:curricula.manage')
+        ->middleware('permission:curricula.create')
         ->middleware('throttle:api')
         ->name('curricula.store');
     Route::get('curricula/{curriculum}', [CurriculumController::class, 'show'])
@@ -315,11 +337,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('curricula.show');
     Route::match(['PUT', 'PATCH'], 'curricula/{curriculum}', [CurriculumController::class, 'update'])
-        ->middleware('permission:curricula.manage')
+        ->middleware('permission:curricula.update')
         ->middleware('throttle:api')
         ->name('curricula.update');
     Route::delete('curricula/{curriculum}', [CurriculumController::class, 'destroy'])
-        ->middleware('permission:curricula.manage')
+        ->middleware('permission:curricula.delete')
         ->middleware('throttle:api')
         ->name('curricula.destroy');
 
@@ -328,7 +350,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('courses.index');
     Route::post('courses', [CourseController::class, 'store'])
-        ->middleware('permission:courses.manage')
+        ->middleware('permission:courses.create')
         ->middleware('throttle:api')
         ->name('courses.store');
     Route::get('courses/{course}', [CourseController::class, 'show'])
@@ -336,11 +358,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('courses.show');
     Route::match(['PUT', 'PATCH'], 'courses/{course}', [CourseController::class, 'update'])
-        ->middleware('permission:courses.manage')
+        ->middleware('permission:courses.update')
         ->middleware('throttle:api')
         ->name('courses.update');
     Route::delete('courses/{course}', [CourseController::class, 'destroy'])
-        ->middleware('permission:courses.manage')
+        ->middleware('permission:courses.delete')
         ->middleware('throttle:api')
         ->name('courses.destroy');
 
@@ -349,7 +371,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('units.index');
     Route::post('units', [UnitController::class, 'store'])
-        ->middleware('permission:units.manage')
+        ->middleware('permission:units.create')
         ->middleware('throttle:api')
         ->name('units.store');
     Route::get('units/{unit}', [UnitController::class, 'show'])
@@ -357,11 +379,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('units.show');
     Route::match(['PUT', 'PATCH'], 'units/{unit}', [UnitController::class, 'update'])
-        ->middleware('permission:units.manage')
+        ->middleware('permission:units.update')
         ->middleware('throttle:api')
         ->name('units.update');
     Route::delete('units/{unit}', [UnitController::class, 'destroy'])
-        ->middleware('permission:units.manage')
+        ->middleware('permission:units.delete')
         ->middleware('throttle:api')
         ->name('units.destroy');
 
@@ -373,7 +395,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('course-units.index');
     Route::post('course-units', [CourseUnitController::class, 'store'])
-        ->middleware('permission:course-units.manage')
+        ->middleware('permission:course-units.create')
         ->middleware('throttle:api')
         ->name('course-units.store');
     Route::get('course-units/{courseUnit}', [CourseUnitController::class, 'show'])
@@ -381,11 +403,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('course-units.show');
     Route::match(['PUT', 'PATCH'], 'course-units/{courseUnit}', [CourseUnitController::class, 'update'])
-        ->middleware('permission:course-units.manage')
+        ->middleware('permission:course-units.update')
         ->middleware('throttle:api')
         ->name('course-units.update');
     Route::delete('course-units/{courseUnit}', [CourseUnitController::class, 'destroy'])
-        ->middleware('permission:course-units.manage')
+        ->middleware('permission:course-units.delete')
         ->middleware('throttle:api')
         ->name('course-units.destroy');
 
@@ -399,7 +421,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('academic-years.index');
     Route::post('academic-years', [AcademicYearController::class, 'store'])
-        ->middleware('permission:academic-years.manage')
+        ->middleware('permission:academic-years.create')
         ->middleware('throttle:api')
         ->name('academic-years.store');
     Route::get('academic-years/{academicYear}', [AcademicYearController::class, 'show'])
@@ -407,11 +429,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('academic-years.show');
     Route::match(['PUT', 'PATCH'], 'academic-years/{academicYear}', [AcademicYearController::class, 'update'])
-        ->middleware('permission:academic-years.manage')
+        ->middleware('permission:academic-years.update')
         ->middleware('throttle:api')
         ->name('academic-years.update');
     Route::delete('academic-years/{academicYear}', [AcademicYearController::class, 'destroy'])
-        ->middleware('permission:academic-years.manage')
+        ->middleware('permission:academic-years.delete')
         ->middleware('throttle:api')
         ->name('academic-years.destroy');
 
@@ -420,7 +442,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('academic-sessions.index');
     Route::post('academic-sessions', [AcademicSessionController::class, 'store'])
-        ->middleware('permission:academic-sessions.manage')
+        ->middleware('permission:academic-sessions.create')
         ->middleware('throttle:api')
         ->name('academic-sessions.store');
     Route::get('academic-sessions/{academicSession}', [AcademicSessionController::class, 'show'])
@@ -428,22 +450,23 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('academic-sessions.show');
     Route::match(['PUT', 'PATCH'], 'academic-sessions/{academicSession}', [AcademicSessionController::class, 'update'])
-        ->middleware('permission:academic-sessions.manage')
+        ->middleware('permission:academic-sessions.update')
         ->middleware('throttle:api')
         ->name('academic-sessions.update');
     Route::delete('academic-sessions/{academicSession}', [AcademicSessionController::class, 'destroy'])
-        ->middleware('permission:academic-sessions.manage')
+        ->middleware('permission:academic-sessions.delete')
         ->middleware('throttle:api')
         ->name('academic-sessions.destroy');
 
-    // Opening a session is gated by permission, so per-user and per-role
-    // grants flow through Spatie's tables.
+    // Opening the registration stage is a state change on the session's
+    // offerings: reading the screen needs view, toggling the stage needs
+    // update.
     Route::get('session-offerings', [SessionOfferingController::class, 'index'])
         ->middleware('permission:session-offerings.view')
         ->middleware('throttle:api')
         ->name('session-offerings.index');
     Route::patch('session-offerings/stage', [SessionOfferingController::class, 'toggle'])
-        ->middleware('permission:session-offerings.manage')
+        ->middleware('permission:session-offerings.update')
         ->middleware('throttle:api')
         ->name('session-offerings.toggle');
 
@@ -452,7 +475,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('term-events.index');
     Route::post('term-events', [TermEventController::class, 'store'])
-        ->middleware('permission:term-events.manage')
+        ->middleware('permission:term-events.create')
         ->middleware('throttle:api')
         ->name('term-events.store');
     Route::get('term-events/{termEvent}', [TermEventController::class, 'show'])
@@ -460,11 +483,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('term-events.show');
     Route::match(['PUT', 'PATCH'], 'term-events/{termEvent}', [TermEventController::class, 'update'])
-        ->middleware('permission:term-events.manage')
+        ->middleware('permission:term-events.update')
         ->middleware('throttle:api')
         ->name('term-events.update');
     Route::delete('term-events/{termEvent}', [TermEventController::class, 'destroy'])
-        ->middleware('permission:term-events.manage')
+        ->middleware('permission:term-events.delete')
         ->middleware('throttle:api')
         ->name('term-events.destroy');
 
@@ -473,7 +496,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('staff.index');
     Route::post('staff', [StaffController::class, 'store'])
-        ->middleware('permission:staff.manage')
+        ->middleware('permission:staff.create')
         ->middleware('throttle:api')
         ->name('staff.store');
     Route::get('staff/{staff}', [StaffController::class, 'show'])
@@ -481,11 +504,11 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('staff.show');
     Route::match(['PUT', 'PATCH'], 'staff/{staff}', [StaffController::class, 'update'])
-        ->middleware('permission:staff.manage')
+        ->middleware('permission:staff.update')
         ->middleware('throttle:api')
         ->name('staff.update');
     Route::delete('staff/{staff}', [StaffController::class, 'destroy'])
-        ->middleware('permission:staff.manage')
+        ->middleware('permission:staff.delete')
         ->middleware('throttle:api')
         ->name('staff.destroy');
 
@@ -494,7 +517,7 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('students.index');
     Route::post('students', [StudentController::class, 'store'])
-        ->middleware('permission:students.manage')
+        ->middleware('permission:students.create')
         ->middleware('throttle:api')
         ->name('students.store');
     Route::get('students/{student}', [StudentController::class, 'show'])
@@ -502,14 +525,17 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('students.show');
     Route::match(['PUT', 'PATCH'], 'students/{student}', [StudentController::class, 'update'])
-        ->middleware('permission:students.manage')
+        ->middleware('permission:students.update')
         ->middleware('throttle:api')
         ->name('students.update');
     Route::delete('students/{student}', [StudentController::class, 'destroy'])
-        ->middleware('permission:students.manage')
+        ->middleware('permission:students.delete')
         ->middleware('throttle:api')
         ->name('students.destroy');
 
+    // Enrolments are created through the student's own registration and
+    // can only be listed or removed (freeing the stage slot), so the
+    // resource carries view and delete alone.
     Route::get('enrolments', [EnrolmentController::class, 'index'])
         ->middleware('permission:enrolments.view')
         ->middleware('throttle:api')
@@ -519,10 +545,12 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('enrolments.show');
     Route::delete('enrolments/{enrolment}', [EnrolmentController::class, 'destroy'])
-        ->middleware('permission:enrolments.manage')
+        ->middleware('permission:enrolments.delete')
         ->middleware('throttle:api')
         ->name('enrolments.destroy');
 
+    // The forensic log is read-only by design: it records what others
+    // did and offers nothing to create, edit or delete.
     Route::get('activities', [ActivityController::class, 'index'])
         ->middleware('permission:activities.view')
         ->middleware('throttle:api')

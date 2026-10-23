@@ -15,6 +15,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -32,6 +33,7 @@ function StatusBadge({ active }) {
 }
 
 export default function Departments() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -87,10 +89,12 @@ export default function Departments() {
             Manage academic departments and their heads of department.
           </p>
         </div>
-        <Link to="/departments/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Department
-        </Link>
+        {can('departments.create') && (
+          <Link to="/departments/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Department
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -159,24 +163,28 @@ export default function Departments() {
                       </td>
                       <td className="py-1">
                         <div className="flex items-center justify-end gap-2 ">
-                          <Link
-                            to={`/departments/${department.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                          >
-                            <Pencil className=' text-muted-foreground' aria-hidden="true" />
-                         <span className=' text-muted-foreground'> Edit</span>
-                          </Link>
-                        <button className='flex items-center justify-end gap-2 '
-                          disabled={deletingId === department.id}
-                          onClick={() => handleDelete(department)}
-                        >
-                          <Trash2 className=' text-red-400' aria-hidden="true" />
-                              <span className=' text-red-400'>  {deletingId === department.id ? 'Deleting…' : 'Delete'}</span>
-
-                        </button>
+                          {can('departments.update') && (
+                            <Link
+                              to={`/departments/${department.id}/edit`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                            >
+                              <Pencil className=' text-muted-foreground' aria-hidden="true" />
+                           <span className=' text-muted-foreground'> Edit</span>
+                            </Link>
+                          )}
+                          {can('departments.delete') && (
+                            <button className='flex items-center justify-end gap-2 '
+                              disabled={deletingId === department.id}
+                              onClick={() => handleDelete(department)}
+                            >
+                              <Trash2 className=' text-red-400' aria-hidden="true" />
+                                  <span className=' text-red-400'>  {deletingId === department.id ? 'Deleting…' : 'Delete'}</span>
+    
+                            </button>
+                          )}
                       </div>
                       </td>
                     </tr>

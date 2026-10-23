@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Users;
 
-use App\Enums\Role;
 use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
@@ -23,7 +22,7 @@ class UserController extends Controller
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
-            'role' => ['nullable', Rule::enum(Role::class)],
+            'role' => ['nullable', 'string', 'max:50', Rule::exists('roles', 'name')],
         ]);
 
         $paginator = $this->paginateList(

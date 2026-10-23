@@ -10,6 +10,7 @@ import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Pencil, Trash2, Plus } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -27,6 +28,7 @@ function StatusBadge({ active }) {
 }
 
 export default function CertificationLevels() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -77,9 +79,11 @@ export default function CertificationLevels() {
             Manage the qualification levels recognised by exam bodies.
           </p>
         </div>
-        <Link to="/certification-levels/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" /> New Certification Level
-        </Link>
+        {can('certification-levels.create') && (
+          <Link to="/certification-levels/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" /> New Certification Level
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -158,22 +162,26 @@ export default function CertificationLevels() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/certification-levels/${level.id}/edit`}
-                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                            <Pencil aria-hidden="true" /> Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === level.id}
-                            onClick={() => handleDelete(level)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === level.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('certification-levels.update') && (
+                            <Link
+                              to={`/certification-levels/${level.id}/edit`}
+                              className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              <Pencil aria-hidden="true" /> Edit
+                            </Link>
+                          )}
+                          {can('certification-levels.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === level.id}
+                              onClick={() => handleDelete(level)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === level.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -10,6 +10,7 @@ import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Pencil, Trash2, Plus } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -39,6 +40,7 @@ function formatDate(value) {
 }
 
 export default function AcademicSessions() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -89,9 +91,11 @@ export default function AcademicSessions() {
             Manage the terms and sessions within each academic year.
           </p>
         </div>
-        <Link to="/academic-sessions/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" /> New Academic Session
-        </Link>
+        {can('academic-sessions.create') && (
+          <Link to="/academic-sessions/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" /> New Academic Session
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -176,26 +180,30 @@ export default function AcademicSessions() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/academic-sessions/${session.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                          >
-                            <Pencil aria-hidden="true" /> Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === session.id}
-                            onClick={() => handleDelete(session)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === session.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('academic-sessions.update') && (
+                            <Link
+                              to={`/academic-sessions/${session.id}/edit`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                            >
+                              <Pencil aria-hidden="true" /> Edit
+                            </Link>
+                          )}
+                          {can('academic-sessions.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === session.id}
+                              onClick={() => handleDelete(session)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === session.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

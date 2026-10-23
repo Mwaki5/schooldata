@@ -10,6 +10,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -39,6 +40,7 @@ function formatDate(value) {
 }
 
 export default function TermEvents() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -88,9 +90,11 @@ export default function TermEvents() {
             and registration weeks.
           </p>
         </div>
-        <Link to="/term-events/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" /> New Term Event
-        </Link>
+        {can('term-events.create') && (
+          <Link to="/term-events/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" /> New Term Event
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -175,22 +179,26 @@ export default function TermEvents() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/term-events/${event.id}/edit`}
-                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                            <Pencil aria-hidden="true" /> Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === event.id}
-                            onClick={() => handleDelete(event)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === event.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('term-events.update') && (
+                            <Link
+                              to={`/term-events/${event.id}/edit`}
+                              className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              <Pencil aria-hidden="true" /> Edit
+                            </Link>
+                          )}
+                          {can('term-events.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === event.id}
+                              onClick={() => handleDelete(event)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === event.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -9,6 +9,7 @@ import { ListSearch } from '@/components/list-search'
 import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 
 /** Course options everywhere show "CODE — Name", matching StudentForm. */
 function courseLabel(course) {
@@ -38,6 +39,7 @@ function SpanBadge({ span }) {
 }
 
 export default function CourseFeeAssignments() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -94,10 +96,12 @@ export default function CourseFeeAssignments() {
             enrolment carries the pair, so their fee is found here.
           </p>
         </div>
-        <Link to="/course-fee-assignments/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Assignment
-        </Link>
+        {can('course-fee-assignments.create') && (
+          <Link to="/course-fee-assignments/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Assignment
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -191,27 +195,31 @@ export default function CourseFeeAssignments() {
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-2">
-                            <Link
-                              to={`/course-fee-assignments/${assignment.id}/edit`}
-                              className={buttonVariants({
-                                variant: 'ghost',
-                                size: 'sm',
-                              })}
-                            >
-                              <Pencil aria-hidden="true" />
-                              Edit
-                            </Link>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              disabled={deletingId === assignment.id}
-                              onClick={() => handleDelete(assignment)}
-                            >
-                              <Trash2 aria-hidden="true" />
-                              {deletingId === assignment.id
-                                ? 'Deleting…'
-                                : 'Delete'}
-                            </Button>
+                            {can('course-fee-assignments.update') && (
+                              <Link
+                                to={`/course-fee-assignments/${assignment.id}/edit`}
+                                className={buttonVariants({
+                                  variant: 'ghost',
+                                  size: 'sm',
+                                })}
+                              >
+                                <Pencil aria-hidden="true" />
+                                Edit
+                              </Link>
+                            )}
+                            {can('course-fee-assignments.delete') && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingId === assignment.id}
+                                onClick={() => handleDelete(assignment)}
+                              >
+                                <Trash2 aria-hidden="true" />
+                                {deletingId === assignment.id
+                                  ? 'Deleting…'
+                                  : 'Delete'}
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

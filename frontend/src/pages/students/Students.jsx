@@ -16,6 +16,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 const STATUS_STYLES = {
   active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -61,6 +62,7 @@ function capitalize(value) {
 }
 
 export default function Students() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [genderFilter, setGenderFilter] = useState('')
@@ -123,10 +125,12 @@ export default function Students() {
             Manage student admissions and their profile records.
           </p>
         </div>
-        <Link to="/students/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Student
-        </Link>
+        {can('students.create') && (
+          <Link to="/students/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Student
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -255,27 +259,31 @@ export default function Students() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/students/${student.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                          >
-                            <Pencil aria-hidden="true" />
-                            Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === student.id}
-                            onClick={() => handleDelete(student)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === student.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('students.update') && (
+                            <Link
+                              to={`/students/${student.id}/edit`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                            >
+                              <Pencil aria-hidden="true" />
+                              Edit
+                            </Link>
+                          )}
+                          {can('students.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === student.id}
+                              onClick={() => handleDelete(student)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === student.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

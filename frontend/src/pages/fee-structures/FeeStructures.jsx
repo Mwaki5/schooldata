@@ -10,6 +10,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -32,6 +33,7 @@ const amountFormat = new Intl.NumberFormat('en-US', {
 })
 
 export default function FeeStructures() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -85,10 +87,12 @@ export default function FeeStructures() {
             its status instead of deleting it once invoices reference it.
           </p>
         </div>
-        <Link to="/fee-structures/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Fee Structure
-        </Link>
+        {can('fee-structures.create') && (
+          <Link to="/fee-structures/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Fee Structure
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -163,27 +167,31 @@ export default function FeeStructures() {
                             <ListChecks aria-hidden="true" />
                             Items
                           </Link>
-                          <Link
-                            to={`/fee-structures/${feeStructure.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                          >
-                            <Pencil aria-hidden="true" />
-                            Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === feeStructure.id}
-                            onClick={() => handleDelete(feeStructure)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === feeStructure.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('fee-structures.update') && (
+                            <Link
+                              to={`/fee-structures/${feeStructure.id}/edit`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                            >
+                              <Pencil aria-hidden="true" />
+                              Edit
+                            </Link>
+                          )}
+                          {can('fee-structures.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === feeStructure.id}
+                              onClick={() => handleDelete(feeStructure)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === feeStructure.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

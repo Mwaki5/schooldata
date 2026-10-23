@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { UnitTypeBadge } from '@/components/unit-type-badge'
 import api, { loadErrorMessage } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -31,6 +32,7 @@ function StatusBadge({ active }) {
  * link's own edit page.
  */
 export default function UnitDetails() {
+  const { can } = useAuth()
   const { unitId } = useParams()
   const navigate = useNavigate()
 
@@ -131,20 +133,24 @@ export default function UnitDetails() {
           >
             <Plus aria-hidden="true" /> Link to Course
           </Link>
-          <Link
-            to={`/units/${unit.id}/edit`}
-            className={buttonVariants({ variant: 'outline' })}
-          >
-            <Pencil aria-hidden="true" /> Edit
-          </Link>
-          <Button
-            variant="destructive"
-            disabled={deleting}
-            onClick={handleDelete}
-          >
-            <Trash2 aria-hidden="true" />
-            {deleting ? 'Deleting…' : 'Delete'}
-          </Button>
+          {can('units.update') && (
+            <Link
+              to={`/units/${unit.id}/edit`}
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              <Pencil aria-hidden="true" /> Edit
+            </Link>
+          )}
+          {can('units.delete') && (
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={handleDelete}
+            >
+              <Trash2 aria-hidden="true" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -188,15 +194,17 @@ export default function UnitDetails() {
                   <div className="flex items-center gap-2">
                     <UnitTypeBadge type={link.unit_type} />
                     <StatusBadge active={link.is_active} />
-                    <Link
-                      to={`/course-units/${link.id}/edit`}
-                      className={buttonVariants({
-                        variant: 'ghost',
-                        size: 'sm',
-                      })}
-                    >
-                      <Pencil aria-hidden="true" /> Edit
-                    </Link>
+                    {can('course-units.update') && (
+                      <Link
+                        to={`/course-units/${link.id}/edit`}
+                        className={buttonVariants({
+                          variant: 'ghost',
+                          size: 'sm',
+                        })}
+                      >
+                        <Pencil aria-hidden="true" /> Edit
+                      </Link>
+                    )}
                   </div>
                 </li>
               ))}

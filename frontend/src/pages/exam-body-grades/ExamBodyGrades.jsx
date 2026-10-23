@@ -11,6 +11,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -35,6 +36,7 @@ function formatScore(value) {
 }
 
 export default function ExamBodyGrades() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
   const [examBodyFilter, setExamBodyFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -119,10 +121,12 @@ export default function ExamBodyGrades() {
             Manage the grade bands each examination authority awards.
           </p>
         </div>
-        <Link to="/exam-body-grades/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Grade Band
-        </Link>
+        {can('exam-body-grades.create') && (
+          <Link to="/exam-body-grades/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Grade Band
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -246,25 +250,29 @@ export default function ExamBodyGrades() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/exam-body-grades/${grade.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                          >
-                            <Pencil aria-hidden="true" />
-                            Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === grade.id}
-                            onClick={() => handleDelete(grade)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === grade.id ? 'Deleting…' : 'Delete'}
-                          </Button>
+                          {can('exam-body-grades.update') && (
+                            <Link
+                              to={`/exam-body-grades/${grade.id}/edit`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                            >
+                              <Pencil aria-hidden="true" />
+                              Edit
+                            </Link>
+                          )}
+                          {can('exam-body-grades.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === grade.id}
+                              onClick={() => handleDelete(grade)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === grade.id ? 'Deleting…' : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

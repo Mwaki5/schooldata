@@ -10,6 +10,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -27,6 +28,7 @@ function StatusBadge({ active }) {
 }
 
 export default function Curricula() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -77,10 +79,12 @@ export default function Curricula() {
             Manage the course versions published by each exam body.
           </p>
         </div>
-        <Link to="/curricula/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Curriculum
-        </Link>
+        {can('curricula.create') && (
+          <Link to="/curricula/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Curriculum
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -145,27 +149,31 @@ export default function Curricula() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/curricula/${curriculum.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                          >
-                            <Pencil aria-hidden="true" />
-                            Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === curriculum.id}
-                            onClick={() => handleDelete(curriculum)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === curriculum.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('curricula.update') && (
+                            <Link
+                              to={`/curricula/${curriculum.id}/edit`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                            >
+                              <Pencil aria-hidden="true" />
+                              Edit
+                            </Link>
+                          )}
+                          {can('curricula.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === curriculum.id}
+                              onClick={() => handleDelete(curriculum)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === curriculum.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -10,6 +10,7 @@ import { ListPagination } from '@/components/list-pagination'
 import { ListSearch } from '@/components/list-search'
 import { useList } from '@/hooks/use-list'
 import api, { loadErrorMessage, validationErrors } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 
 const amountFormat = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -22,6 +23,7 @@ const amountFormat = new Intl.NumberFormat('en-US', {
  * every items response, so it always reflects what is on screen.
  */
 export default function FeeStructureItems() {
+  const { can } = useAuth()
   const { feeStructureId } = useParams()
 
   const [structure, setStructure] = useState(null)
@@ -250,13 +252,16 @@ export default function FeeStructureItems() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <Button type="submit" disabled={submitting}>
-                {submitting
-                  ? 'Saving…'
-                  : editingItem
-                    ? 'Save Changes'
-                    : 'Add Item'}
-              </Button>
+              {(can('fee-structures.create') ||
+                can('fee-structures.update')) && (
+                  <Button type="submit" disabled={submitting}>
+                    {submitting
+                      ? 'Saving…'
+                      : editingItem
+                        ? 'Save Changes'
+                        : 'Add Item'}
+                  </Button>
+                )}
               {editingItem && (
                 <Button
                   type="button"
@@ -298,23 +303,27 @@ export default function FeeStructureItems() {
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEdit(item)}
-                            >
-                              <Pencil aria-hidden="true" />
-                              Edit
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              disabled={deletingId === item.id}
-                              onClick={() => handleDelete(item)}
-                            >
-                              <Trash2 aria-hidden="true" />
-                              {deletingId === item.id ? 'Deleting…' : 'Delete'}
-                            </Button>
+                            {can('fee-structures.update') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEdit(item)}
+                              >
+                                <Pencil aria-hidden="true" />
+                                Edit
+                              </Button>
+                            )}
+                            {can('fee-structures.delete') && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingId === item.id}
+                                onClick={() => handleDelete(item)}
+                              >
+                                <Trash2 aria-hidden="true" />
+                                {deletingId === item.id ? 'Deleting…' : 'Delete'}
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

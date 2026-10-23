@@ -70,8 +70,11 @@ function AuthProvider({ children }) {
     }
   }
 
+  const can = (permission) =>
+    Boolean(user?.permissions?.includes(permission))
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, can }}>
       {children}
     </AuthContext.Provider>
   )

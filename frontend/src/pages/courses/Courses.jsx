@@ -10,6 +10,7 @@ import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { BookOpen, Pencil, Trash2, Plus } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -27,6 +28,7 @@ function StatusBadge({ active }) {
 }
 
 export default function Courses() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -75,9 +77,11 @@ export default function Courses() {
             Manage the courses offered by the school.
           </p>
         </div>
-        <Link to="/courses/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" /> New Course
-        </Link>
+        {can('courses.create') && (
+          <Link to="/courses/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" /> New Course
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -178,22 +182,26 @@ export default function Courses() {
                             title="View and edit this course's units">
                             <BookOpen aria-hidden="true" /> Units
                           </Link>
-                          <Link
-                            to={`/courses/${course.id}/edit`}
-                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                            <Pencil aria-hidden="true" /> Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === course.id}
-                            onClick={() => handleDelete(course)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === course.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('courses.update') && (
+                            <Link
+                              to={`/courses/${course.id}/edit`}
+                              className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              <Pencil aria-hidden="true" /> Edit
+                            </Link>
+                          )}
+                          {can('courses.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === course.id}
+                              onClick={() => handleDelete(course)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === course.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

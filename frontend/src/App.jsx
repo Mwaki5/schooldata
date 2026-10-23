@@ -154,9 +154,9 @@ export default function App() {
             <Route path="/my-units" element={<MyUnits />} />
             <Route path="/graded" element={<MyGrades />} />
           </Route>
-          {/* Each module carries its own permission; the backend tags
-              the read endpoints `{module}.view` and the writing ones
-              `{module}.manage`, so this guard mirrors the view side. */}
+          {/* Each module has one permission per verb: `.view` to read
+              and `.create`/`.update`/`.delete` to write. This guard
+              mirrors the view side; form routes name their own verb. */}
           <Route
             element={
               <PermissionRoute permission="roles.view">
@@ -174,10 +174,21 @@ export default function App() {
             }
           >
             <Route path="/departments" element={<Departments />} />
-            <Route path="/departments/create" element={<DepartmentForm />} />
+            <Route
+              path="/departments/create"
+              element={
+                <PermissionRoute permission="departments.create">
+                  <DepartmentForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/departments/:departmentId/edit"
-              element={<DepartmentForm />}
+              element={
+                <PermissionRoute permission="departments.update">
+                  <DepartmentForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -188,10 +199,21 @@ export default function App() {
             }
           >
             <Route path="/exam-bodies" element={<ExamBodies />} />
-            <Route path="/exam-bodies/create" element={<ExamBodyForm />} />
+            <Route
+              path="/exam-bodies/create"
+              element={
+                <PermissionRoute permission="exam-bodies.create">
+                  <ExamBodyForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/exam-bodies/:examBodyId/edit"
-              element={<ExamBodyForm />}
+              element={
+                <PermissionRoute permission="exam-bodies.update">
+                  <ExamBodyForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -202,10 +224,21 @@ export default function App() {
             }
           >
             <Route path="/exam-body-grades" element={<ExamBodyGrades />} />
-            <Route path="/exam-body-grades/create" element={<ExamBodyGradeForm />} />
+            <Route
+              path="/exam-body-grades/create"
+              element={
+                <PermissionRoute permission="exam-body-grades.create">
+                  <ExamBodyGradeForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/exam-body-grades/:gradeId/edit"
-              element={<ExamBodyGradeForm />}
+              element={
+                <PermissionRoute permission="exam-body-grades.update">
+                  <ExamBodyGradeForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -216,14 +249,25 @@ export default function App() {
             }
           >
             <Route path="/fee-structures" element={<FeeStructures />} />
-            <Route path="/fee-structures/create" element={<FeeStructureForm />} />
+            <Route
+              path="/fee-structures/create"
+              element={
+                <PermissionRoute permission="fee-structures.create">
+                  <FeeStructureForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/fee-structures/:feeStructureId/items"
               element={<FeeStructureItems />}
             />
             <Route
               path="/fee-structures/:feeStructureId/edit"
-              element={<FeeStructureForm />}
+              element={
+                <PermissionRoute permission="fee-structures.update">
+                  <FeeStructureForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -239,11 +283,19 @@ export default function App() {
             />
             <Route
               path="/course-fee-assignments/create"
-              element={<CourseFeeAssignmentForm />}
+              element={
+                <PermissionRoute permission="course-fee-assignments.create">
+                  <CourseFeeAssignmentForm />
+                </PermissionRoute>
+              }
             />
             <Route
               path="/course-fee-assignments/:courseFeeAssignmentId/edit"
-              element={<CourseFeeAssignmentForm />}
+              element={
+                <PermissionRoute permission="course-fee-assignments.update">
+                  <CourseFeeAssignmentForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -254,10 +306,21 @@ export default function App() {
             }
           >
             <Route path="/certification-levels" element={<CertificationLevels />} />
-            <Route path="/certification-levels/create" element={<CertificationLevelForm />} />
+            <Route
+              path="/certification-levels/create"
+              element={
+                <PermissionRoute permission="certification-levels.create">
+                  <CertificationLevelForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/certification-levels/:levelId/edit"
-              element={<CertificationLevelForm />}
+              element={
+                <PermissionRoute permission="certification-levels.update">
+                  <CertificationLevelForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -268,10 +331,21 @@ export default function App() {
             }
           >
             <Route path="/curricula" element={<Curricula />} />
-            <Route path="/curricula/create" element={<CurriculumForm />} />
+            <Route
+              path="/curricula/create"
+              element={
+                <PermissionRoute permission="curricula.create">
+                  <CurriculumForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/curricula/:curriculumId/edit"
-              element={<CurriculumForm />}
+              element={
+                <PermissionRoute permission="curricula.update">
+                  <CurriculumForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -282,12 +356,26 @@ export default function App() {
             }
           >
             <Route path="/courses" element={<Courses />} />
-            <Route path="/courses/create" element={<CourseForm />} />
+            <Route
+              path="/courses/create"
+              element={
+                <PermissionRoute permission="courses.create">
+                  <CourseForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/courses/:courseId/units"
               element={<CourseUnits />}
             />
-            <Route path="/courses/:courseId/edit" element={<CourseForm />} />
+            <Route
+              path="/courses/:courseId/edit"
+              element={
+                <PermissionRoute permission="courses.update">
+                  <CourseForm />
+                </PermissionRoute>
+              }
+            />
           </Route>
           <Route
             element={
@@ -297,9 +385,23 @@ export default function App() {
             }
           >
             <Route path="/units" element={<Units />} />
-            <Route path="/units/create" element={<UnitForm />} />
+            <Route
+              path="/units/create"
+              element={
+                <PermissionRoute permission="units.create">
+                  <UnitForm />
+                </PermissionRoute>
+              }
+            />
             <Route path="/units/:unitId" element={<UnitDetails />} />
-            <Route path="/units/:unitId/edit" element={<UnitForm />} />
+            <Route
+              path="/units/:unitId/edit"
+              element={
+                <PermissionRoute permission="units.update">
+                  <UnitForm />
+                </PermissionRoute>
+              }
+            />
           </Route>
           <Route
             element={
@@ -309,10 +411,21 @@ export default function App() {
             }
           >
             <Route path="/course-units" element={<CourseUnitList />} />
-            <Route path="/course-units/create" element={<CourseUnitForm />} />
+            <Route
+              path="/course-units/create"
+              element={
+                <PermissionRoute permission="course-units.create">
+                  <CourseUnitForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/course-units/:courseUnitId/edit"
-              element={<CourseUnitForm />}
+              element={
+                <PermissionRoute permission="course-units.update">
+                  <CourseUnitForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -323,10 +436,21 @@ export default function App() {
             }
           >
             <Route path="/academic-years" element={<AcademicYears />} />
-            <Route path="/academic-years/create" element={<AcademicYearForm />} />
+            <Route
+              path="/academic-years/create"
+              element={
+                <PermissionRoute permission="academic-years.create">
+                  <AcademicYearForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/academic-years/:yearId/edit"
-              element={<AcademicYearForm />}
+              element={
+                <PermissionRoute permission="academic-years.update">
+                  <AcademicYearForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -339,11 +463,19 @@ export default function App() {
             <Route path="/academic-sessions" element={<AcademicSessions />} />
             <Route
               path="/academic-sessions/create"
-              element={<AcademicSessionForm />}
+              element={
+                <PermissionRoute permission="academic-sessions.create">
+                  <AcademicSessionForm />
+                </PermissionRoute>
+              }
             />
             <Route
               path="/academic-sessions/:sessionId/edit"
-              element={<AcademicSessionForm />}
+              element={
+                <PermissionRoute permission="academic-sessions.update">
+                  <AcademicSessionForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -363,10 +495,21 @@ export default function App() {
             }
           >
             <Route path="/term-events" element={<TermEvents />} />
-            <Route path="/term-events/create" element={<TermEventForm />} />
+            <Route
+              path="/term-events/create"
+              element={
+                <PermissionRoute permission="term-events.create">
+                  <TermEventForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/term-events/:eventId/edit"
-              element={<TermEventForm />}
+              element={
+                <PermissionRoute permission="term-events.update">
+                  <TermEventForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -377,8 +520,22 @@ export default function App() {
             }
           >
             <Route path="/staff" element={<Staff />} />
-            <Route path="/staff/create" element={<StaffForm />} />
-            <Route path="/staff/:staffId/edit" element={<StaffForm />} />
+            <Route
+              path="/staff/create"
+              element={
+                <PermissionRoute permission="staff.create">
+                  <StaffForm />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="/staff/:staffId/edit"
+              element={
+                <PermissionRoute permission="staff.update">
+                  <StaffForm />
+                </PermissionRoute>
+              }
+            />
           </Route>
           <Route
             element={
@@ -388,10 +545,21 @@ export default function App() {
             }
           >
             <Route path="/students" element={<Students />} />
-            <Route path="/students/create" element={<StudentForm />} />
+            <Route
+              path="/students/create"
+              element={
+                <PermissionRoute permission="students.create">
+                  <StudentForm />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="/students/:studentId/edit"
-              element={<StudentForm />}
+              element={
+                <PermissionRoute permission="students.update">
+                  <StudentForm />
+                </PermissionRoute>
+              }
             />
           </Route>
           <Route
@@ -414,7 +582,7 @@ export default function App() {
           </Route>
           {/* Grading console: the backend tags the reads with
               `permission:unit-grades.view` and awarding marks with
-              `permission:unit-grades.manage`. */}
+              `permission:unit-grades.update`. */}
           <Route
             element={
               <PermissionRoute permission="unit-grades.view">

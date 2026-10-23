@@ -15,6 +15,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 const EMPLOYMENT_TYPE_LABELS = {
   full_time: 'Full-time',
@@ -57,6 +58,7 @@ function StatusBadge({ status }) {
 }
 
 export default function Staff() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -111,10 +113,12 @@ export default function Staff() {
             Manage the school&apos;s teaching and non-teaching staff.
           </p>
         </div>
-        <Link to="/staff/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          New Staff Member
-        </Link>
+        {can('staff.create') && (
+          <Link to="/staff/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            New Staff Member
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -202,27 +206,31 @@ export default function Staff() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/staff/${staffMember.id}/edit`}
-                            className={buttonVariants({
-                              variant: 'ghost',
-                              size: 'sm',
-                            })}
-                          >
-                            <Pencil aria-hidden="true" />
-                            Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === staffMember.id}
-                            onClick={() => handleDelete(staffMember)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === staffMember.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('staff.update') && (
+                            <Link
+                              to={`/staff/${staffMember.id}/edit`}
+                              className={buttonVariants({
+                                variant: 'ghost',
+                                size: 'sm',
+                              })}
+                            >
+                              <Pencil aria-hidden="true" />
+                              Edit
+                            </Link>
+                          )}
+                          {can('staff.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === staffMember.id}
+                              onClick={() => handleDelete(staffMember)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === staffMember.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

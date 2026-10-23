@@ -59,7 +59,7 @@ class StaffController extends Controller
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'employment_status' => ['nullable', 'string', 'max:50'],
             'employment_type' => ['nullable', 'string', 'max:50'],
-            'role' => ['nullable', Rule::enum(Role::class)],
+            'role' => ['nullable', 'string', 'max:50', Rule::exists('roles', 'name')],
         ]);
 
         $paginator = $this->paginateList(

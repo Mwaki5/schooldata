@@ -15,6 +15,7 @@ import { SortableTh } from '@/components/sortable-th'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 const STATUS_STYLES = {
   ENROLLED: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -51,6 +52,7 @@ function formatDate(value) {
 }
 
 export default function Enrolments() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
   const [statusFilter, setStatusFilter] = useState('')
 
@@ -242,17 +244,19 @@ export default function Enrolments() {
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              disabled={deletingId === enrolment.id}
-                              onClick={() => handleDelete(enrolment)}
-                            >
-                              <Trash2 aria-hidden="true" />
-                              {deletingId === enrolment.id
-                                ? 'Deleting…'
-                                : 'Delete'}
-                            </Button>
+                            {can('enrolments.delete') && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingId === enrolment.id}
+                                onClick={() => handleDelete(enrolment)}
+                              >
+                                <Trash2 aria-hidden="true" />
+                                {deletingId === enrolment.id
+                                  ? 'Deleting…'
+                                  : 'Delete'}
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

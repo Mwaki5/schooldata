@@ -31,15 +31,6 @@ class StoreStaffRequest extends FormRequest
     public const GENDERS = ['male', 'female', 'other'];
 
     /**
-     * The system roles a staff member can hold: every Role enum value
-     * except `student`, since students are not staff. The enum rule
-     * compares cases strictly, so this list holds enum cases.
-     *
-     * @var list<Role>
-     */
-    public const STAFF_ROLES = [Role::Admin, Role::Trainer, Role::Finance];
-
-    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
@@ -93,7 +84,10 @@ class StoreStaffRequest extends FormRequest
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'employment_type' => ['nullable', 'string', Rule::in(self::EMPLOYMENT_TYPES)],
             'employment_status' => ['nullable', 'string', Rule::in(self::EMPLOYMENT_STATUSES)],
-            'role' => ['required', 'string', Rule::enum(Role::class)->only(self::STAFF_ROLES)],
+            // Any seeded or custom role the system knows may ride along
+            // with a staff profile and mirrors onto its account; the
+            // student role cannot, since students are not staff.
+            'role' => ['required', 'string', 'max:50', Rule::exists('roles', 'name'), Rule::notIn([Role::Student->value])],
             'date_joined' => ['nullable', 'date'],
             'confirmation_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date'],

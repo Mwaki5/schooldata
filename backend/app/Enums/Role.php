@@ -3,10 +3,14 @@
 namespace App\Enums;
 
 /**
- * The application's fixed role catalog.
+ * The application's built-in role catalog.
  *
- * Roles are hardcoded so they cannot be altered through the database or
- * the API; the roles endpoint simply renders this enum.
+ * These four roles are seeded into Spatie's tables with default
+ * permission bundles and human labels; after seeding they live in the
+ * database like any other role — their permissions are edited through
+ * the roles screen, and custom roles can be created alongside them.
+ * The admin role is the one exception: it is locked and always holds
+ * every permission except the student portal.
  */
 enum Role: string
 {
@@ -42,7 +46,9 @@ enum Role: string
     }
 
     /**
-     * The permissions this role bundles, as granted by the application.
+     * The permissions this role is seeded with — the default bundle a
+     * fresh database starts from. Assignments are editable afterwards,
+     * so the seeder only applies these when it first creates the role.
      *
      * A user may hold several roles; their effective permissions are the
      * union of every role's bundle. Routes and UI check these permission
@@ -53,45 +59,29 @@ enum Role: string
     public function permissions(): array
     {
         return match ($this) {
-            // Every module permission; the student portal is excluded
-            // because it renders the signed-in account's own student
-            // data, which only student accounts have.
+            // Every permission except the student portal, which renders
+            // the signed-in account's own student data and only makes
+            // sense on student accounts.
             self::Admin => array_values(array_filter(
                 Permission::cases(),
                 fn (Permission $permission): bool => $permission !== Permission::StudentPortal,
             )),
+            // The grading console: read it, and award or edit marks.
             self::Trainer => [
                 Permission::UnitGradesView,
-                Permission::UnitGradesManage,
+                Permission::UnitGradesUpdate,
             ],
             self::Student => [Permission::StudentPortal],
             self::Finance => [
                 Permission::FeeStructuresView,
-                Permission::FeeStructuresManage,
+                Permission::FeeStructuresCreate,
+                Permission::FeeStructuresUpdate,
+                Permission::FeeStructuresDelete,
                 Permission::CourseFeeAssignmentsView,
-                Permission::CourseFeeAssignmentsManage,
+                Permission::CourseFeeAssignmentsCreate,
+                Permission::CourseFeeAssignmentsUpdate,
+                Permission::CourseFeeAssignmentsDelete,
             ],
         };
-    }
-
-    /**
-     * The hardcoded catalog served by GET /api/roles.
-     *
-     * Ids are stable positional values (1-4) so clients can key by them.
-     *
-     * @return list<array{id: int, name: string, slug: string, description: string}>
-     */
-    public static function catalog(): array
-    {
-        return array_map(
-            fn (self $role, int $index): array => [
-                'id' => $index + 1,
-                'name' => $role->label(),
-                'slug' => $role->value,
-                'description' => $role->description(),
-            ],
-            self::cases(),
-            array_keys(self::cases()),
-        );
     }
 }

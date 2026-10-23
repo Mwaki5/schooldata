@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 const PAGE_SIZE = 12
 
@@ -137,6 +138,7 @@ function StepMarker({ number, label, active, done }) {
 }
 
 export default function OpenSession() {
+  const { can } = useAuth()
   const [sessions, setSessions] = useState([])
   const [sessionId, setSessionId] = useState('')
   const [step, setStep] = useState(1)
@@ -617,7 +619,10 @@ export default function OpenSession() {
                             >
                               <Checkbox
                                 checked={stage.is_open}
-                                disabled={pending}
+                                disabled={
+                                  pending ||
+                                  !can('session-offerings.update')
+                                }
                                 onChange={() => toggleStage(stage)}
                                 aria-label={`${course.code} ${stage.code} ${
                                   stage.is_open ? 'open' : 'closed'

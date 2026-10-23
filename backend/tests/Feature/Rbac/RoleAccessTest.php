@@ -4,6 +4,7 @@ use App\Models\CertificationLevel;
 use App\Models\Department;
 use App\Models\ExamBody;
 use App\Models\Staff;
+use App\Models\StudentProfile;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -78,6 +79,33 @@ test('a route accepts one or many permissions in a single middleware tag', funct
     'unknown permission fails closed for everyone' => ['bogus', 'admin', 403],
 ]);
 
+test('each verb of a resource is gated by its own permission', function (string $permission, string $method, string $uri, int $status) {
+    $user = User::factory()->create();
+    $user->syncRoles([]);
+    $user->givePermissionTo($permission);
+
+    // Implicit binding resolves before the permission middleware, so
+    // every writing case needs a real record — a missing id would
+    // answer 404 on both sides of the gate.
+    $student = StudentProfile::factory()->create();
+
+    $this->withToken(rbacAccessTokenFor($user))
+        ->json($method, str_replace('{student}', (string) $student->id, $uri), [])
+        ->assertStatus($status);
+})->with([
+    // A students-view grant opens the list and nothing else; each
+    // writing verb needs its own permission. A middleware that passes
+    // answers 422 on an empty payload or 204 on destroy, never 403.
+    'students: view opens the list' => ['students.view', 'GET', '/api/students', 200],
+    'students: view does not open create' => ['students.view', 'POST', '/api/students', 403],
+    'students: view does not open update' => ['students.view', 'PUT', '/api/students/{student}', 403],
+    'students: view does not open delete' => ['students.view', 'DELETE', '/api/students/{student}', 403],
+    'students: create opens the store endpoint' => ['students.create', 'POST', '/api/students', 422],
+    'students: update opens the edit endpoint' => ['students.update', 'PUT', '/api/students/{student}', 422],
+    'students: delete opens the destroy endpoint' => ['students.delete', 'DELETE', '/api/students/{student}', 204],
+    'students: delete does not open the list' => ['students.delete', 'GET', '/api/students', 403],
+]);
+
 test('the authenticated user profile carries their roles and permissions', function () {
     $user = User::factory()->finance()->create();
 
@@ -86,9 +114,13 @@ test('the authenticated user profile carries their roles and permissions', funct
         ->assertOk()
         ->assertJsonPath('user.roles', ['finance'])
         ->assertJsonPath('user.permissions', [
-            'course-fee-assignments.manage',
+            'course-fee-assignments.create',
+            'course-fee-assignments.delete',
+            'course-fee-assignments.update',
             'course-fee-assignments.view',
-            'fee-structures.manage',
+            'fee-structures.create',
+            'fee-structures.delete',
+            'fee-structures.update',
             'fee-structures.view',
         ]);
 });
@@ -121,7 +153,8 @@ test('a permission granted to the user alone decides access', function () {
 
     $token = rbacAccessTokenFor($user);
 
-    // The direct grant opens the read endpoint only; manage stays closed.
+    // The direct grant opens the read endpoint only; create stays
+    // closed until its own permission arrives.
     $this->withToken($token)->getJson('/api/departments')->assertOk();
     $this->withToken($token)->postJson('/api/departments', ['name' => 'Intrusion'])->assertForbidden();
 });
@@ -149,7 +182,7 @@ test('a registration request cannot choose its own access', function () {
         'password_confirmation' => 'password123',
         'role' => 'admin',
         'roles' => ['admin'],
-        'permissions' => ['users.manage'],
+        'permissions' => ['students.create'],
     ])->assertCreated();
 
     $user = User::where('email', 'sneaky@example.com')->firstOrFail();

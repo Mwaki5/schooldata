@@ -35,7 +35,13 @@ const EMPLOYMENT_STATUSES = [
   { value: 'retired', label: 'Retired' },
 ]
 
-const STAFF_ROLES = [
+/**
+ * Staff may hold any role the system knows except the student role.
+ * The list loads from the API so custom roles appear too; a failed
+ * load (the roles endpoint needs roles.view) falls back to the
+ * seeded staff roles so the form still renders.
+ */
+const FALLBACK_ROLE_OPTIONS = [
   { value: 'trainer', label: 'Trainer' },
   { value: 'admin', label: 'Admin' },
   { value: 'finance', label: 'Finance' },
@@ -66,6 +72,7 @@ export default function StaffForm() {
   const [loadError, setLoadError] = useState(null)
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+  const [roleOptions, setRoleOptions] = useState(FALLBACK_ROLE_OPTIONS)
 
   useEffect(() => {
     if (!isEdit) {
@@ -112,6 +119,33 @@ export default function StaffForm() {
       active = false
     }
   }, [isEdit, staffId])
+
+  // The role select lists every role the system knows, minus the student
+  // role the backend refuses for staff. The API sends built-ins first,
+  // then custom roles alphabetically.
+  useEffect(() => {
+    let active = true
+
+    api
+      .get('/roles', { params: { per_page: 100 } })
+      .then(({ data }) => {
+        if (active) {
+          setRoleOptions(
+            data.roles
+              .filter((role) => role.slug !== 'student')
+              .map((role) => ({ value: role.slug, label: role.name })),
+          )
+        }
+      })
+      .catch(() => {
+        // Keep the seeded fallback — the roles endpoint may be out of
+        // reach for this account.
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -555,9 +589,12 @@ export default function StaffForm() {
                   <Select
                     id="role"
                     name="role"
+                    // Remount when the options arrive so an async-loaded
+                    // staff role (or a custom role) shows as selected.
+                    key={roleOptions.map((option) => option.value).join('|')}
                     defaultValue={staff?.role ?? 'trainer'}
                   >
-                    {STAFF_ROLES.map((role) => (
+                    {roleOptions.map((role) => (
                       <option key={role.value} value={role.value}>
                         {role.label}
                       </option>

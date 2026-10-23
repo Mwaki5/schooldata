@@ -10,6 +10,7 @@ import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Pencil, Trash2, Plus } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -39,6 +40,7 @@ function formatDate(value) {
 }
 
 export default function AcademicYears() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
 
   const {
@@ -87,9 +89,11 @@ export default function AcademicYears() {
             Manage the academic years the school runs its programmes in.
           </p>
         </div>
-        <Link to="/academic-years/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" /> New Academic Year
-        </Link>
+        {can('academic-years.create') && (
+          <Link to="/academic-years/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" /> New Academic Year
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -170,22 +174,26 @@ export default function AcademicYears() {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/academic-years/${year.id}/edit`}
-                            className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                            <Pencil aria-hidden="true" /> Edit
-                          </Link>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingId === year.id}
-                            onClick={() => handleDelete(year)}
-                          >
-                            <Trash2 aria-hidden="true" />
-                            {deletingId === year.id
-                              ? 'Deleting…'
-                              : 'Delete'}
-                          </Button>
+                          {can('academic-years.update') && (
+                            <Link
+                              to={`/academic-years/${year.id}/edit`}
+                              className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                              <Pencil aria-hidden="true" /> Edit
+                            </Link>
+                          )}
+                          {can('academic-years.delete') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingId === year.id}
+                              onClick={() => handleDelete(year)}
+                            >
+                              <Trash2 aria-hidden="true" />
+                              {deletingId === year.id
+                                ? 'Deleting…'
+                                : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

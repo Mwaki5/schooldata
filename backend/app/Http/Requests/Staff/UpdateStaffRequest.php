@@ -67,7 +67,10 @@ class UpdateStaffRequest extends FormRequest
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'employment_type' => ['nullable', 'string', Rule::in(StoreStaffRequest::EMPLOYMENT_TYPES)],
             'employment_status' => ['nullable', 'string', Rule::in(StoreStaffRequest::EMPLOYMENT_STATUSES)],
-            'role' => ['required', 'string', Rule::enum(Role::class)->only(StoreStaffRequest::STAFF_ROLES)],
+            // Any seeded or custom role the system knows may ride along
+            // with a staff profile and mirrors onto its account; the
+            // student role cannot, since students are not staff.
+            'role' => ['required', 'string', 'max:50', Rule::exists('roles', 'name'), Rule::notIn([Role::Student->value])],
             'date_joined' => ['nullable', 'date'],
             'confirmation_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date'],

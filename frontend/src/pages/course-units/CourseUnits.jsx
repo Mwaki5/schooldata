@@ -12,6 +12,7 @@ import { UnitTypeBadge } from '@/components/unit-type-badge'
 import { useList } from '@/hooks/use-list'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 
 function StatusBadge({ active }) {
   return (
@@ -34,6 +35,7 @@ function StatusBadge({ active }) {
  * this page only manages where and how a unit is taught.
  */
 export default function CourseUnits() {
+  const { can } = useAuth()
   const [deletingId, setDeletingId] = useState(null)
   const [togglingId, setTogglingId] = useState(null)
   const [unitFilter, setUnitFilter] = useState('')
@@ -187,10 +189,12 @@ export default function CourseUnits() {
             teaching load, credit factor and role.
           </p>
         </div>
-        <Link to="/course-units/create" className={buttonVariants()}>
-          <Plus aria-hidden="true" />
-          Link Unit
-        </Link>
+        {can('course-units.create') && (
+          <Link to="/course-units/create" className={buttonVariants()}>
+            <Plus aria-hidden="true" />
+            Link Unit
+          </Link>
+        )}
       </div>
 
       {loadError && (
@@ -360,41 +364,47 @@ export default function CourseUnits() {
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1">
-                            <Link
-                              to={`/course-units/${link.id}/edit`}
-                              className={buttonVariants({
-                                variant: 'ghost',
-                                size: 'sm',
-                              })}
-                              title="Edit course unit"
-                              aria-label={`Edit ${link.unit?.code ?? 'course unit'}`}
-                            >
-                              <Pencil aria-hidden="true" />
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={togglingId === link.id}
-                              title={
-                                link.is_active
-                                  ? 'Mark inactive'
-                                  : 'Mark active'
-                              }
-                              aria-label={`${link.is_active ? 'Deactivate' : 'Activate'} ${link.unit?.code ?? 'course unit'}`}
-                              onClick={() => handleToggleActive(link)}
-                            >
-                              <Power aria-hidden="true" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={deletingId === link.id}
-                              title="Unlink from course"
-                              aria-label={`Unlink ${link.unit?.code ?? 'course unit'}`}
-                              onClick={() => handleDelete(link)}
-                            >
-                              <Trash2 aria-hidden="true" />
-                            </Button>
+                            {can('course-units.update') && (
+                              <Link
+                                to={`/course-units/${link.id}/edit`}
+                                className={buttonVariants({
+                                  variant: 'ghost',
+                                  size: 'sm',
+                                })}
+                                title="Edit course unit"
+                                aria-label={`Edit ${link.unit?.code ?? 'course unit'}`}
+                              >
+                                <Pencil aria-hidden="true" />
+                              </Link>
+                            )}
+                            {can('course-units.update') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={togglingId === link.id}
+                                title={
+                                  link.is_active
+                                    ? 'Mark inactive'
+                                    : 'Mark active'
+                                }
+                                aria-label={`${link.is_active ? 'Deactivate' : 'Activate'} ${link.unit?.code ?? 'course unit'}`}
+                                onClick={() => handleToggleActive(link)}
+                              >
+                                <Power aria-hidden="true" />
+                              </Button>
+                            )}
+                            {can('course-units.delete') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={deletingId === link.id}
+                                title="Unlink from course"
+                                aria-label={`Unlink ${link.unit?.code ?? 'course unit'}`}
+                                onClick={() => handleDelete(link)}
+                              >
+                                <Trash2 aria-hidden="true" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
