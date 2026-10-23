@@ -61,14 +61,6 @@ class UnitRegistration extends Model
     }
 
     /**
-     * The staff member who approved the registration, when signed off.
-     */
-    public function approver(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'approved_by');
-    }
-
-    /**
      * Get the activity log configuration for the model: log the fillable
      * attributes on every change, but skip no-op updates.
      */

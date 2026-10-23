@@ -66,20 +66,4 @@ class SessionStageOffering extends Model
     {
         return $this->belongsTo(CourseStage::class);
     }
-
-    /**
-     * The user who first opened the row.
-     */
-    public function creator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    /**
-     * The user who last changed the row.
-     */
-    public function updater(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
 }

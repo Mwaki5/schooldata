@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Staff;
 
-use App\Enums\Role;
 use App\Http\Controllers\Concerns\PaginatesLists;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Staff\StoreStaffRequest;
