@@ -24,6 +24,9 @@ const FeeStructureForm = lazy(() => import('@/pages/fee-structures/FeeStructureF
 const FeeStructureItems = lazy(() => import('@/pages/fee-structures/FeeStructureItems'))
 const CourseFeeAssignments = lazy(() => import('@/pages/course-fee-assignments/CourseFeeAssignments'))
 const CourseFeeAssignmentForm = lazy(() => import('@/pages/course-fee-assignments/CourseFeeAssignmentForm'))
+const Invoices = lazy(() => import('@/pages/invoices/Invoices'))
+const InvoiceForm = lazy(() => import('@/pages/invoices/InvoiceForm'))
+const InvoiceShow = lazy(() => import('@/pages/invoices/InvoiceShow'))
 const CertificationLevels = lazy(() => import('@/pages/certification-levels/CertificationLevels'))
 const CertificationLevelForm = lazy(() => import('@/pages/certification-levels/CertificationLevelForm'))
 const Curricula = lazy(() => import('@/pages/curricula/Curricula'))
@@ -294,6 +297,32 @@ export default function App() {
               element={
                 <PermissionRoute permission="course-fee-assignments.update">
                   <CourseFeeAssignmentForm />
+                </PermissionRoute>
+              }
+            />
+          </Route>
+          <Route
+            element={
+              <PermissionRoute permission="invoices.view">
+                <Outlet />
+              </PermissionRoute>
+            }
+          >
+            <Route path="/invoices" element={<Invoices />} />
+            <Route
+              path="/invoices/create"
+              element={
+                <PermissionRoute permission="invoices.create">
+                  <InvoiceForm />
+                </PermissionRoute>
+              }
+            />
+            <Route path="/invoices/:invoiceId" element={<InvoiceShow />} />
+            <Route
+              path="/invoices/:invoiceId/edit"
+              element={
+                <PermissionRoute permission="invoices.update">
+                  <InvoiceForm />
                 </PermissionRoute>
               }
             />

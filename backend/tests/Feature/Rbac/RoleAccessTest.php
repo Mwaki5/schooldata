@@ -122,6 +122,10 @@ test('the authenticated user profile carries their roles and permissions', funct
             'fee-structures.delete',
             'fee-structures.update',
             'fee-structures.view',
+            'invoices.create',
+            'invoices.delete',
+            'invoices.update',
+            'invoices.view',
         ]);
 });
 

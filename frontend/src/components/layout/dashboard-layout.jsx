@@ -87,6 +87,7 @@ const NAV_ITEMS = [
     children: [
       { label: 'Fee Structure', to: '/fee-structures', permission: 'fee-structures.view' },
       { label: 'Course Fees', to: '/course-fee-assignments', permission: 'course-fee-assignments.view' },
+      { label: 'Invoices', to: '/invoices', permission: 'invoices.view' },
     ],
   },
 ]
@@ -114,6 +115,7 @@ const PAGE_TITLES = {
   '/fee-structures': 'Fee Structures',
   '/fee-structures/:feeStructureId/items': 'Fee Structure Items',
   '/course-fee-assignments': 'Course Fee Assignments',
+  '/invoices': 'Invoices',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',

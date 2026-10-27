@@ -17,6 +17,7 @@ use App\Http\Controllers\ExamBodies\ExamBodyController;
 use App\Http\Controllers\ExamBodyGrades\ExamBodyGradeController;
 use App\Http\Controllers\FeeStructures\FeeStructureController;
 use App\Http\Controllers\FeeStructures\FeeStructureItemController;
+use App\Http\Controllers\Invoices\InvoiceController;
 use App\Http\Controllers\Me\DashboardController;
 use App\Http\Controllers\Me\MyGradesController;
 use App\Http\Controllers\Me\MyUnitsController;
@@ -335,6 +336,39 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('permission:course-fee-assignments.delete')
         ->middleware('throttle:api')
         ->name('course-fee-assignments.destroy');
+
+    // Invoices: what the finance desk bills a student — a sequential
+    // number, the student and session it is raised against, and the
+    // typed line items (fee, penalty, hostel, …) that add up to its
+    // total. `invoices/students` is the invoice form's student picker;
+    // it sits above the {invoice} routes so the static segment is
+    // matched before the wildcard can bind it as a model id, and it
+    // rides `invoices.create` because only the invoice form needs it —
+    // finance does not hold `students.view`.
+    Route::get('invoices', [InvoiceController::class, 'index'])
+        ->middleware('permission:invoices.view')
+        ->middleware('throttle:api')
+        ->name('invoices.index');
+    Route::post('invoices', [InvoiceController::class, 'store'])
+        ->middleware('permission:invoices.create')
+        ->middleware('throttle:api')
+        ->name('invoices.store');
+    Route::get('invoices/students', [InvoiceController::class, 'students'])
+        ->middleware('permission:invoices.create')
+        ->middleware('throttle:api')
+        ->name('invoices.students');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
+        ->middleware('permission:invoices.view')
+        ->middleware('throttle:api')
+        ->name('invoices.show');
+    Route::match(['PUT', 'PATCH'], 'invoices/{invoice}', [InvoiceController::class, 'update'])
+        ->middleware('permission:invoices.update')
+        ->middleware('throttle:api')
+        ->name('invoices.update');
+    Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])
+        ->middleware('permission:invoices.delete')
+        ->middleware('throttle:api')
+        ->name('invoices.destroy');
 
     Route::get('curricula', [CurriculumController::class, 'index'])
         ->middleware('permission:curricula.view')

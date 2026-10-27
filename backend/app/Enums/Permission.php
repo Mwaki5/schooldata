@@ -75,6 +75,10 @@ enum Permission: string
     case FeeStructuresCreate = 'fee-structures.create';
     case FeeStructuresUpdate = 'fee-structures.update';
     case FeeStructuresDelete = 'fee-structures.delete';
+    case InvoicesView = 'invoices.view';
+    case InvoicesCreate = 'invoices.create';
+    case InvoicesUpdate = 'invoices.update';
+    case InvoicesDelete = 'invoices.delete';
     case RolesView = 'roles.view';
     case RolesCreate = 'roles.create';
     case RolesUpdate = 'roles.update';

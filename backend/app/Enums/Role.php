@@ -81,6 +81,10 @@ enum Role: string
                 Permission::CourseFeeAssignmentsCreate,
                 Permission::CourseFeeAssignmentsUpdate,
                 Permission::CourseFeeAssignmentsDelete,
+                Permission::InvoicesView,
+                Permission::InvoicesCreate,
+                Permission::InvoicesUpdate,
+                Permission::InvoicesDelete,
             ],
         };
     }
