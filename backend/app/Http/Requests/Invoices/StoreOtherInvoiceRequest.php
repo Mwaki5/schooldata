@@ -2,12 +2,12 @@
 
 namespace App\Http\Requests\Invoices;
 
-use App\Enums\InvoiceItemType;
+use App\Enums\InvoiceType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreInvoiceRequest extends FormRequest
+class StoreOtherInvoiceRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -26,12 +26,12 @@ class StoreInvoiceRequest extends FormRequest
     {
         return [
             'student_id' => ['required', 'integer', 'exists:student_profiles,id'],
-            'academic_session_id' => ['required', 'integer', 'exists:academic_sessions,id'],
-            'description' => ['nullable', 'string', 'max:500'],
-            'items' => ['required', 'array', 'min:1', 'max:50'],
-            'items.*.type' => ['required', 'string', Rule::in(InvoiceItemType::values())],
-            'items.*.description' => ['required', 'string', 'max:500'],
-            'items.*.amount' => ['required', 'numeric', 'min:0'],
+            // The structured fee invoice has its own endpoint and its
+            // own rules, so it is not offerable here.
+            'invoice_type' => ['required', 'string', Rule::in(InvoiceType::otherValues())],
+            'description' => ['required', 'string', 'max:500'],
+            'amount' => ['required', 'numeric', 'min:0.01', 'decimal:0,2'],
+            'idempotency_key' => ['required', 'string', 'min:8', 'max:100'],
         ];
     }
 }

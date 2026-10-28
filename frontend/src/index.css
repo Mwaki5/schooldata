@@ -168,3 +168,31 @@
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background-color: rgb(255 255 255 / 0.4);
 }
+
+/**
+ * Print / PDF. The statement and the payment receipt both hand their
+ * contents to the browser's print dialog, so the app chrome (sidebar,
+ * navbar) and anything marked `.no-print` (filters, forms, buttons)
+ * drop out, the canvas goes white, and the tables print in black.
+ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Let the printable content own the page instead of sitting inside
+     the app's fixed-height, scroll-locked shell. */
+  .print\:h-auto,
+  main,
+  #root > div {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}

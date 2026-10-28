@@ -72,6 +72,11 @@ enum Role: string
                 Permission::UnitGradesUpdate,
             ],
             self::Student => [Permission::StudentPortal],
+            // The fees desk: the fee plans, and the immutable ledger —
+            // bill students, take payments and read statements. The
+            // more restricted verbs (backdating a payment, refunding a
+            // credit) are deliberately left out; grant them to a
+            // tighter custom role when the school needs them.
             self::Finance => [
                 Permission::FeeStructuresView,
                 Permission::FeeStructuresCreate,
@@ -83,8 +88,11 @@ enum Role: string
                 Permission::CourseFeeAssignmentsDelete,
                 Permission::InvoicesView,
                 Permission::InvoicesCreate,
-                Permission::InvoicesUpdate,
-                Permission::InvoicesDelete,
+                Permission::InvoicesReverse,
+                Permission::PaymentsView,
+                Permission::PaymentsReceive,
+                Permission::PaymentsReverse,
+                Permission::StatementsView,
             ],
         };
     }

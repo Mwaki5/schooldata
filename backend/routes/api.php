@@ -23,9 +23,12 @@ use App\Http\Controllers\Me\MyGradesController;
 use App\Http\Controllers\Me\MyUnitsController;
 use App\Http\Controllers\Me\ReportSessionController;
 use App\Http\Controllers\Me\SessionUnitsController;
+use App\Http\Controllers\Payments\PaymentController;
+use App\Http\Controllers\Refunds\RefundController;
 use App\Http\Controllers\Roles\RoleController;
 use App\Http\Controllers\SessionOfferings\SessionOfferingController;
 use App\Http\Controllers\Staff\StaffController;
+use App\Http\Controllers\Statements\StatementController;
 use App\Http\Controllers\Students\StudentController;
 use App\Http\Controllers\TermEvents\TermEventController;
 use App\Http\Controllers\UnitGrades\UnitGradeController;
@@ -337,38 +340,116 @@ Route::middleware(['auth:api', 'access.type'])->group(function () {
         ->middleware('throttle:api')
         ->name('course-fee-assignments.destroy');
 
-    // Invoices: what the finance desk bills a student — a sequential
-    // number, the student and session it is raised against, and the
-    // typed line items (fee, penalty, hostel, …) that add up to its
-    // total. `invoices/students` is the invoice form's student picker;
-    // it sits above the {invoice} routes so the static segment is
-    // matched before the wildcard can bind it as a model id, and it
-    // rides `invoices.create` because only the invoice form needs it —
-    // finance does not hold `students.view`.
+    // The finance ledger: immutable invoices and payments with their
+    // reversals, refunds of held credit, and the derived per-student
+    // balance and statement. Every write below carries an
+    // idempotency key, stamps the active session and the acting user
+    // server-side, and has NO update or delete counterpart anywhere
+    // in the API — corrections are reversals, new linked rows with
+    // negative amounts. Derivation (paid / outstanding / status /
+    // balance) is always the backend's StudentLedgerService; clients
+    // send ids and text only. The two static picker paths sit above
+    // the {invoice} / {payment} wildcards so the segments match
+    // before a model id could bind them, and each rides its own
+    // desk's permission because finance does not hold `students.view`.
     Route::get('invoices', [InvoiceController::class, 'index'])
         ->middleware('permission:invoices.view')
         ->middleware('throttle:api')
         ->name('invoices.index');
-    Route::post('invoices', [InvoiceController::class, 'store'])
+    Route::post('invoices/fee', [InvoiceController::class, 'storeFee'])
         ->middleware('permission:invoices.create')
         ->middleware('throttle:api')
-        ->name('invoices.store');
+        ->name('invoices.store-fee');
+    Route::post('invoices/other', [InvoiceController::class, 'storeOther'])
+        ->middleware('permission:invoices.create')
+        ->middleware('throttle:api')
+        ->name('invoices.store-other');
     Route::get('invoices/students', [InvoiceController::class, 'students'])
         ->middleware('permission:invoices.create')
         ->middleware('throttle:api')
         ->name('invoices.students');
+    Route::get('students/{student}/invoices', [InvoiceController::class, 'forStudent'])
+        ->middleware('permission:invoices.view,invoices.reverse')
+        ->middleware('throttle:api')
+        ->name('students.invoices');
+    Route::get('invoices/fee-structures', [InvoiceController::class, 'feeStructures'])
+        ->middleware('permission:invoices.create')
+        ->middleware('throttle:api')
+        ->name('invoices.fee-structures');
+    Route::get('invoices/{invoice}/reversal-preview', [InvoiceController::class, 'reversalPreview'])
+        ->middleware('permission:invoices.reverse')
+        ->middleware('throttle:api')
+        ->name('invoices.reversal-preview');
+    Route::post('invoices/{invoice}/reverse', [InvoiceController::class, 'reverse'])
+        ->middleware('permission:invoices.reverse')
+        ->middleware('throttle:api')
+        ->name('invoices.reverse');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])
         ->middleware('permission:invoices.view')
         ->middleware('throttle:api')
         ->name('invoices.show');
-    Route::match(['PUT', 'PATCH'], 'invoices/{invoice}', [InvoiceController::class, 'update'])
-        ->middleware('permission:invoices.update')
+
+    // The shared student picker behind every finance screen. It answers
+    // with just what a picker renders (id, composed name, admission
+    // number) and rides the cash desk's permissions — plus
+    // `statements.view`, because the read-only statement screen picks a
+    // student the same way and its readers hold no payments verb.
+    Route::get('payments/students', [PaymentController::class, 'students'])
+        ->middleware('permission:payments.receive,payments.reverse,statements.view')
         ->middleware('throttle:api')
-        ->name('invoices.update');
-    Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])
-        ->middleware('permission:invoices.delete')
+        ->name('payments.students');
+    Route::get('students/{student}/payments', [PaymentController::class, 'forStudent'])
+        ->middleware('permission:payments.receive,payments.reverse')
         ->middleware('throttle:api')
-        ->name('invoices.destroy');
+        ->name('students.payments');
+    Route::post('payments', [PaymentController::class, 'store'])
+        ->middleware('permission:payments.receive')
+        ->middleware('throttle:api')
+        ->name('payments.store');
+    Route::get('payments/{payment}/reversal-preview', [PaymentController::class, 'reversalPreview'])
+        ->middleware('permission:payments.reverse')
+        ->middleware('throttle:api')
+        ->name('payments.reversal-preview');
+    Route::post('payments/{payment}/reverse', [PaymentController::class, 'reverse'])
+        ->middleware('permission:payments.reverse')
+        ->middleware('throttle:api')
+        ->name('payments.reverse');
+
+    Route::post('refunds', [RefundController::class, 'store'])
+        ->middleware('permission:refunds.create')
+        ->middleware('throttle:api')
+        ->name('refunds.store');
+    // Reversing a refund is the same restricted verb as issuing one: it
+    // puts money back into the student's held credit, so it belongs on
+    // the same admin-only desk. Without this a refund paid in error
+    // would be a permanent dead end — and a refunded payment could
+    // never be reversed, since that is blocked until the refund is.
+    Route::get('refunds/{refund}/reversal-preview', [RefundController::class, 'reversalPreview'])
+        ->middleware('permission:refunds.create')
+        ->middleware('throttle:api')
+        ->name('refunds.reversal-preview');
+    Route::post('refunds/{refund}/reverse', [RefundController::class, 'reverse'])
+        ->middleware('permission:refunds.create')
+        ->middleware('throttle:api')
+        ->name('refunds.reverse');
+    // The per-student refund reads, so the reverse-refund desk can list
+    // a student's refunds and show which are already corrected.
+    Route::get('students/{student}/refunds', [RefundController::class, 'forStudent'])
+        ->middleware('permission:refunds.create')
+        ->middleware('throttle:api')
+        ->name('students.refunds');
+
+    // The per-student finance reads. Balance serves the cash desk's
+    // settlement preview and the statement screen alike, so it rides
+    // either permission; the statement itself is its own read.
+    Route::get('students/{student}/balance', [PaymentController::class, 'balance'])
+        ->middleware('permission:payments.receive,statements.view')
+        ->middleware('throttle:api')
+        ->name('students.balance');
+    Route::get('students/{student}/statement', StatementController::class)
+        ->middleware('permission:statements.view')
+        ->middleware('throttle:api')
+        ->name('students.statement');
 
     Route::get('curricula', [CurriculumController::class, 'index'])
         ->middleware('permission:curricula.view')

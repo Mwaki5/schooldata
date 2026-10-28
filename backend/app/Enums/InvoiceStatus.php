@@ -3,16 +3,23 @@
 namespace App\Enums;
 
 /**
- * The lifecycle states an invoice can hold. Every invoice is raised as
- * pending; the finance desk flips it to paid when a settlement lands
- * and voids one that must not be collected. Payments themselves are
- * recorded against the invoice when that module is built.
+ * The states an invoice can present with. None of these are stored:
+ * every one is derived from the immutable ledger rows by the
+ * StudentLedgerService, so a status always reflects the live set of
+ * invoices, payments and refunds.
+ *
+ * - `unpaid`          nothing settled yet
+ * - `partially_paid`  some, but not all, of the amount is settled
+ * - `paid`            fully settled by the oldest-first allocation
+ * - `reversed`        the invoice (or reversal row) is excluded from
+ *                     allocation entirely
  */
 enum InvoiceStatus: string
 {
-    case Pending = 'pending';
+    case Unpaid = 'unpaid';
+    case PartiallyPaid = 'partially_paid';
     case Paid = 'paid';
-    case Void = 'void';
+    case Reversed = 'reversed';
 
     /**
      * The statuses as plain strings, for validation and filters.

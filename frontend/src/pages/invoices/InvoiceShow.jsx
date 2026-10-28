@@ -1,43 +1,40 @@
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Link2, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useParams } from 'react-router-dom'
 import PageLoader from '@/components/page-loader'
-import { FormField } from '@/components/form-field'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import api, { isNotFound } from '@/lib/api'
+import api, { loadErrorMessage } from '@/lib/api'
 import {
-  LINE_TYPES,
-  amountFormat,
-  formatDate,
-} from '@/pages/invoices/invoice-constants'
+  ENTRY_KIND_LABELS,
+  INVOICE_TYPE_LABELS,
+  formatAmount,
+  formatDateTime,
+  studentLabel,
+} from '@/lib/finance-constants'
 import { StatusPill } from '@/pages/invoices/status-pill'
 import { useAuth } from '@/context/AuthContext'
 
-function lineTypeLabel(type) {
-  return LINE_TYPES.find((row) => row.value === type)?.label ?? type
-}
-
 /**
- * One invoice in full: its number and status over the billed student,
- * session and date, and the lines that add up to its total — with the
- * edit and delete actions the finance desk holds.
+ * One invoice in full, read-only.
+ *
+ * Every figure is derived by the backend's ledger; this screen only
+ * renders them. There is no edit and no delete — a mistake is
+ * corrected on the "Reverse Invoice" tab, and when this invoice has
+ * been reversed (or is itself a reversal) the linked document is shown
+ * here so the trail stays visible.
  */
 export default function InvoiceShow() {
   const { invoiceId } = useParams()
   const { can } = useAuth()
-  const navigate = useNavigate()
-
   const [invoice, setInvoice] = useState(null)
+  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(null)
-  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -47,18 +44,19 @@ export default function InvoiceShow() {
       .then(({ data }) => {
         if (active) {
           setInvoice(data.invoice)
+          setError(null)
         }
       })
-      .catch((error) => {
-        if (!active) {
-          return
+      .catch((caught) => {
+        if (active) {
+          setError(
+            loadErrorMessage(
+              caught,
+              'Invoice',
+              'Unable to load this invoice. Please try again.',
+            ),
+          )
         }
-
-        setLoadError(
-          isNotFound(error)
-            ? 'Invoice not found. It may have been deleted.'
-            : 'Unable to load the invoice. Please try again.',
-        )
       })
       .finally(() => {
         if (active) {
@@ -71,160 +69,168 @@ export default function InvoiceShow() {
     }
   }, [invoiceId])
 
-  const handleDelete = async () => {
-    if (!window.confirm(`Delete invoice ${invoice.invoice_number}?`)) {
-      return
-    }
-
-    setDeleting(true)
-
-    try {
-      await api.delete(`/invoices/${invoice.id}`)
-
-      toast.success(`Deleted invoice ${invoice.invoice_number}`)
-      navigate('/invoices')
-    } catch (error) {
-      setDeleting(false)
-      toast.error(
-        error.response?.data?.message ??
-          `Unable to delete invoice ${invoice.invoice_number}. Please try again.`,
-      )
-    }
-  }
-
   if (loading) {
     return <PageLoader />
   }
 
-  if (loadError) {
+  if (error) {
     return (
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div
-          role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
-        >
-          {loadError}
-        </div>
+      <div className="mx-auto max-w-3xl space-y-6">
         <Link
           to="/invoices"
-          className={buttonVariants({ variant: 'outline' })}
+          className={`${buttonVariants({ variant: 'outline', size: 'sm' })} w-fit`}
         >
-          <ArrowLeft aria-hidden="true" />
-          Back to invoices
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Back to ledger
         </Link>
+        <p role="alert" className="py-12 text-center text-sm text-destructive">
+          {error}
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <Link to="/invoices" className={buttonVariants({ variant: 'ghost' })}>
-        <ArrowLeft aria-hidden="true" />
-        Back to invoices
-      </Link>
-
+    <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight tabular-nums">
-            {invoice.invoice_number}
-          </h1>
-          <StatusPill status={invoice.status} />
-        </div>
-        <div className="flex items-center gap-2">
-          {can('invoices.update') && (
+        <Link
+          to="/invoices"
+          className={`${buttonVariants({ variant: 'outline', size: 'sm' })} w-fit`}
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Back to ledger
+        </Link>
+
+        {can('invoices.reverse') &&
+          invoice.entry_kind === 'INVOICE' &&
+          invoice.status !== 'reversed' && (
             <Link
-              to={`/invoices/${invoice.id}/edit`}
+              to="/invoices/create"
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
             >
-              <Pencil aria-hidden="true" />
-              Edit
+              <Undo2 aria-hidden="true" className="size-4" />
+              Reverse this invoice
             </Link>
           )}
-          {can('invoices.delete') && (
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={deleting}
-              onClick={handleDelete}
-            >
-              <Trash2 aria-hidden="true" />
-              {deleting ? 'Deleting…' : 'Delete'}
-            </Button>
-          )}
-        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-5 sm:grid-cols-3">
-          <FormField id="show-student" label="Student">
-            <div>
-              <p className="text-sm font-medium">{invoice.student_name}</p>
-              {invoice.student_login_id && (
-                <p className="text-xs text-muted-foreground">
-                  {invoice.student_login_id}
-                </p>
-              )}
-            </div>
-          </FormField>
-          <FormField id="show-session" label="Academic Session">
-            <p className="text-sm">{invoice.academic_session_name ?? '—'}</p>
-          </FormField>
-          <FormField id="show-raised" label="Raised">
-            <p className="text-sm">{formatDate(invoice.created_at)}</p>
-          </FormField>
-        </CardContent>
-      </Card>
-
-      {invoice.description && (
-        <p className="text-sm text-muted-foreground">{invoice.description}</p>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Line Items</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-3 font-medium">Type</th>
-                  <th className="pb-3 font-medium">Description</th>
-                  <th className="pb-3 text-right font-medium">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {invoice.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="py-3">
-                      <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                        {lineTypeLabel(item.type)}
-                      </span>
-                    </td>
-                    <td className="py-3">{item.description}</td>
-                    <td className="py-3 text-right tabular-nums">
-                      {amountFormat.format(item.amount ?? 0)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t font-medium">
-                  <td className="pt-3" colSpan={2}>
-                    Total
-                  </td>
-                  <td className="pt-3 text-right tabular-nums">
-                    {amountFormat.format(invoice.total ?? 0)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-3">
+              {invoice.invoice_number}
+              <StatusPill status={invoice.status} />
+            </CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {ENTRY_KIND_LABELS[invoice.entry_kind] ?? invoice.entry_kind}
+            </span>
           </div>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
+            <Detail label="Student" value={studentLabel({
+              name: invoice.student_name,
+              login_id: invoice.student_login_id,
+            })} />
+            <Detail
+              label="Academic session"
+              value={invoice.academic_session_name ?? '—'}
+            />
+            <Detail
+              label="Type"
+              value={
+                INVOICE_TYPE_LABELS[invoice.invoice_type] ?? invoice.invoice_type
+              }
+            />
+            <Detail
+              label="Fee structure"
+              value={invoice.fee_structure_name ?? '—'}
+            />
+            <Detail
+              label="Amount"
+              value={formatAmount(invoice.amount)}
+              numeric
+            />
+            <Detail label="Paid" value={formatAmount(invoice.paid)} numeric />
+            <Detail
+              label="Outstanding"
+              value={formatAmount(invoice.outstanding)}
+              numeric
+            />
+            <Detail
+              label="Raised"
+              value={formatDateTime(invoice.created_at)}
+            />
+          </dl>
+
+          {invoice.description && (
+            <div>
+              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Description
+              </h3>
+              <p className="mt-1 text-sm">{invoice.description}</p>
+            </div>
+          )}
+
+          {invoice.reversal_reason && (
+            <div className="rounded-lg bg-muted px-3 py-2 text-sm">
+              <p className="flex items-center gap-2 font-medium">
+                <Link2 aria-hidden="true" className="size-4" />
+                {invoice.entry_kind === 'REVERSAL'
+                  ? 'This invoice is a reversal'
+                  : 'This invoice has been reversed'}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                Reason: {invoice.reversal_reason}
+              </p>
+            </div>
+          )}
+
+          {invoice.reverses && (
+            <p className="text-sm text-muted-foreground">
+              Reverses{' '}
+              <Link
+                to={`/invoices/${invoice.reverses.id}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {invoice.reverses.invoice_number}
+              </Link>{' '}
+              ({formatAmount(invoice.reverses.amount)}).
+            </p>
+          )}
+
+          {invoice.reversed_by && (
+            <p className="text-sm text-muted-foreground">
+              Reversed by{' '}
+              <Link
+                to={`/invoices/${invoice.reversed_by.id}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {invoice.reversed_by.invoice_number}
+              </Link>{' '}
+              on {formatDateTime(invoice.reversed_by.created_at)}.
+            </p>
+          )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function Detail({ label, value, numeric = false }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd
+        className={
+          numeric ? 'mt-1 font-medium tabular-nums' : 'mt-1 font-medium'
+        }
+      >
+        {value}
+      </dd>
     </div>
   )
 }

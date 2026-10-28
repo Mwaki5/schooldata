@@ -68,9 +68,12 @@ test('the roles list returns the seeded catalog in enum order with each roles pe
             'fee-structures.update',
             'fee-structures.view',
             'invoices.create',
-            'invoices.delete',
-            'invoices.update',
+            'invoices.reverse',
             'invoices.view',
+            'payments.receive',
+            'payments.reverse',
+            'payments.view',
+            'statements.view',
         ]);
 });
 

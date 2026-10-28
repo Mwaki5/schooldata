@@ -27,6 +27,8 @@ const CourseFeeAssignmentForm = lazy(() => import('@/pages/course-fee-assignment
 const Invoices = lazy(() => import('@/pages/invoices/Invoices'))
 const InvoiceForm = lazy(() => import('@/pages/invoices/InvoiceForm'))
 const InvoiceShow = lazy(() => import('@/pages/invoices/InvoiceShow'))
+const Payments = lazy(() => import('@/pages/payments/Payments'))
+const Statement = lazy(() => import('@/pages/statement/Statement'))
 const CertificationLevels = lazy(() => import('@/pages/certification-levels/CertificationLevels'))
 const CertificationLevelForm = lazy(() => import('@/pages/certification-levels/CertificationLevelForm'))
 const Curricula = lazy(() => import('@/pages/curricula/Curricula'))
@@ -318,15 +320,26 @@ export default function App() {
               }
             />
             <Route path="/invoices/:invoiceId" element={<InvoiceShow />} />
-            <Route
-              path="/invoices/:invoiceId/edit"
-              element={
-                <PermissionRoute permission="invoices.update">
-                  <InvoiceForm />
-                </PermissionRoute>
-              }
-            />
           </Route>
+          {/* The cash desk. Its tabs are permission-filtered inside the
+              page (receive / reverse / refund), so the route itself only
+              needs the desk's view verb. There is no edit or delete. */}
+          <Route
+            path="/payments"
+            element={
+              <PermissionRoute permission="payments.view">
+                <Payments />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/statement"
+            element={
+              <PermissionRoute permission="statements.view">
+                <Statement />
+              </PermissionRoute>
+            }
+          />
           <Route
             element={
               <PermissionRoute permission="certification-levels.view">

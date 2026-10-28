@@ -1,16 +1,19 @@
 import { cn } from '@/lib/utils'
-import { STATUS_LABELS, STATUS_STYLES } from '@/pages/invoices/invoice-constants'
+import {
+  INVOICE_STATUS_LABELS,
+  INVOICE_STATUS_STYLES,
+} from '@/lib/finance-constants'
 
-/** The inline pill an invoice's status wears — no Badge component. */
+/** The inline pill an invoice's derived status wears — no Badge component. */
 export function StatusPill({ status }) {
   return (
     <span
       className={cn(
         'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-        STATUS_STYLES[status] ?? STATUS_STYLES.void,
+        INVOICE_STATUS_STYLES[status] ?? INVOICE_STATUS_STYLES.reversed,
       )}
     >
-      {STATUS_LABELS[status] ?? status}
+      {INVOICE_STATUS_LABELS[status] ?? status}
     </span>
   )
 }

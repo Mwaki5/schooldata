@@ -20,6 +20,13 @@ namespace App\Enums;
  *   (session-offerings), which upsert rather than insert
  * - `delete` admits the destroy endpoint
  *
+ * The finance ledger is the exception to the verb pattern: its rows are
+ * immutable, so it has no update or delete anywhere. Instead it carries
+ * its own verbs — `reverse` (correct an invoice or payment by reversal),
+ * `receive` (take a payment in), `backdate` (date a payment into the
+ * past) — plus `refunds.create` for crediting money back and
+ * `statements.view` for the read-only student ledger.
+ *
  * Resources without a given route simply carry no permission for it:
  * activities and users are read-only today, enrolments can only be
  * listed and removed, and the student's self-service area is a single
@@ -77,8 +84,13 @@ enum Permission: string
     case FeeStructuresDelete = 'fee-structures.delete';
     case InvoicesView = 'invoices.view';
     case InvoicesCreate = 'invoices.create';
-    case InvoicesUpdate = 'invoices.update';
-    case InvoicesDelete = 'invoices.delete';
+    case InvoicesReverse = 'invoices.reverse';
+    case PaymentsView = 'payments.view';
+    case PaymentsReceive = 'payments.receive';
+    case PaymentsReverse = 'payments.reverse';
+    case PaymentsBackdate = 'payments.backdate';
+    case RefundsCreate = 'refunds.create';
+    case StatementsView = 'statements.view';
     case RolesView = 'roles.view';
     case RolesCreate = 'roles.create';
     case RolesUpdate = 'roles.update';

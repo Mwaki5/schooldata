@@ -88,6 +88,8 @@ const NAV_ITEMS = [
       { label: 'Fee Structure', to: '/fee-structures', permission: 'fee-structures.view' },
       { label: 'Course Fees', to: '/course-fee-assignments', permission: 'course-fee-assignments.view' },
       { label: 'Invoices', to: '/invoices', permission: 'invoices.view' },
+      { label: 'Payments', to: '/payments', permission: 'payments.view' },
+      { label: 'Statement', to: '/statement', permission: 'statements.view' },
     ],
   },
 ]
@@ -116,6 +118,10 @@ const PAGE_TITLES = {
   '/fee-structures/:feeStructureId/items': 'Fee Structure Items',
   '/course-fee-assignments': 'Course Fee Assignments',
   '/invoices': 'Invoices',
+  '/invoices/create': 'New Invoice',
+  '/invoices/:invoiceId': 'Invoice',
+  '/payments': 'Payments',
+  '/statement': 'Statement',
   '/staff': 'Staff',
   '/students': 'Students',
   '/students/create': 'Students',
@@ -235,7 +241,7 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        'flex flex-col border-r border-sidebar-border bg-sidebar',
+        'flex flex-col border-r border-sidebar-border bg-sidebar no-print',
         isMobile
           ? cn(
               'w-[250px]',
@@ -538,7 +544,7 @@ function Navbar({ isMobile, onOpenMobile }) {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:px-6">
+    <header className="no-print sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:px-6">
       <div className="flex items-center gap-3">
         {isMobile && (
           <button
