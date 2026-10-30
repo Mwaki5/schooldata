@@ -40,17 +40,9 @@ class RefundController extends Controller
 
         $refund->load(['student.user', 'academicSession']);
 
-        $ledger = $this->ledger->forStudent((int) $refund->student_id);
-
         return response()->json([
             'refund' => new RefundResource($refund),
-            'balance' => [
-                'total_invoiced' => $ledger['total_invoiced'],
-                'net_payments' => $ledger['net_payments'],
-                'balance' => $ledger['balance'],
-                'arrears' => $ledger['arrears'],
-                'credit' => $ledger['credit'],
-            ],
+            'balance' => $this->ledger->summary((int) $refund->student_id),
         ], Response::HTTP_CREATED);
     }
 
@@ -66,17 +58,9 @@ class RefundController extends Controller
 
         $reversal->load(['student.user', 'academicSession', 'reverses']);
 
-        $ledger = $this->ledger->forStudent((int) $reversal->student_id);
-
         return response()->json([
             'refund' => new RefundResource($reversal),
-            'balance' => [
-                'total_invoiced' => $ledger['total_invoiced'],
-                'net_payments' => $ledger['net_payments'],
-                'balance' => $ledger['balance'],
-                'arrears' => $ledger['arrears'],
-                'credit' => $ledger['credit'],
-            ],
+            'balance' => $this->ledger->summary((int) $reversal->student_id),
         ], Response::HTTP_CREATED);
     }
 
@@ -88,8 +72,7 @@ class RefundController extends Controller
      */
     public function reversalPreview(Refund $refund): JsonResponse
     {
-        $before = $this->ledger->forStudent((int) $refund->student_id);
-        $after = $this->ledger->hypothetical(
+        ['before' => $before, 'after' => $after] = $this->ledger->beforeAndAfter(
             (int) $refund->student_id,
             addedRefunds: [['amount' => -1 * round((float) $refund->amount, 2)]],
         );

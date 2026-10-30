@@ -36,8 +36,6 @@ export const INVOICE_STATUS_FILTERS = [
 
 // FEE_INVOICE is the structured one, raised from a fee structure; every
 // other type is a free-form "other invoice" the desk amounts by hand.
-export const FEE_INVOICE = 'FEE_INVOICE'
-
 export const INVOICE_TYPE_LABELS = {
   FEE_INVOICE: 'Fee Invoice',
   PENALTY: 'Penalty',
@@ -77,16 +75,6 @@ export const ENTRY_KIND_LABELS = {
   REFUND_REVERSAL: 'Reversal',
 }
 
-// A reversal row wears its own marker so a table can flag it without
-// reading the linked id.
-export function isReversalRow(entryKind) {
-  return (
-    entryKind === 'REVERSAL' ||
-    entryKind === 'PAYMENT_REVERSAL' ||
-    entryKind === 'REFUND_REVERSAL'
-  )
-}
-
 const amountFormat = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -100,25 +88,6 @@ export function formatKes(value) {
 /** The bare number, for table cells that carry their own currency header. */
 export function formatAmount(value) {
   return amountFormat.format(Number(value) || 0)
-}
-
-/** A signed amount, so reversal rows read as negatives at a glance. */
-export function formatSignedAmount(value) {
-  const amount = Number(value) || 0
-
-  return amount < 0
-    ? `-${amountFormat.format(Math.abs(amount))}`
-    : amountFormat.format(amount)
-}
-
-export function formatDate(value) {
-  if (!value) {
-    return '—'
-  }
-
-  const date = new Date(value)
-
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
 }
 
 export function formatDateTime(value) {

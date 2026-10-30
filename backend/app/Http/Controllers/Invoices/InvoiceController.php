@@ -278,8 +278,7 @@ class InvoiceController extends Controller
      */
     public function reversalPreview(Invoice $invoice): JsonResponse
     {
-        $before = $this->ledger->forStudent((int) $invoice->student_id);
-        $after = $this->ledger->hypothetical(
+        ['before' => $before, 'after' => $after] = $this->ledger->beforeAndAfter(
             (int) $invoice->student_id,
             excludedInvoiceIds: [$invoice->id],
         );

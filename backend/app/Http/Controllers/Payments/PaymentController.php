@@ -47,7 +47,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'payment' => new PaymentResource($payment),
-            'balance' => $this->balanceSummary((int) $payment->student_id),
+            'balance' => $this->ledger->summary((int) $payment->student_id),
         ], Response::HTTP_CREATED);
     }
 
@@ -65,7 +65,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'payment' => new PaymentResource($reversal),
-            'balance' => $this->balanceSummary((int) $reversal->student_id),
+            'balance' => $this->ledger->summary((int) $reversal->student_id),
         ], Response::HTTP_CREATED);
     }
 
@@ -114,7 +114,21 @@ class PaymentController extends Controller
             'preview_amount' => ['nullable', 'numeric', 'min:0.01', 'decimal:0,2'],
         ]);
 
-        $ledger = $this->ledger->forStudent($student->id);
+        $previewAmount = isset($data['preview_amount'])
+            ? round((float) $data['preview_amount'], 2)
+            : null;
+
+        // With a preview amount, the "before" and "after" ledgers come
+        // from ONE load of the rows; without one, only the live ledger
+        // is derived.
+        if ($previewAmount === null) {
+            $ledger = $this->ledger->forStudent($student->id);
+        } else {
+            ['before' => $ledger, 'after' => $after] = $this->ledger->beforeAndAfter(
+                $student->id,
+                addedPayments: [['amount' => $previewAmount]],
+            );
+        }
 
         $payload = [
             'student' => $this->studentPayload($student),
@@ -128,15 +142,11 @@ class PaymentController extends Controller
                 ->values(),
         ];
 
-        if (isset($data['preview_amount'])) {
-            $amount = round((float) $data['preview_amount'], 2);
-
-            $after = $this->ledger->hypothetical($student->id, addedPayments: [['amount' => $amount]]);
-
+        if ($previewAmount !== null) {
             $beforePaid = collect($ledger['invoices'])->pluck('paid', 'id');
 
             $payload['preview'] = [
-                'amount' => $amount,
+                'amount' => $previewAmount,
                 'applied' => collect($after['invoices'])
                     ->map(fn (array $invoice): ?array => [
                         'invoice_number' => $invoice['invoice_number'],
@@ -158,8 +168,7 @@ class PaymentController extends Controller
      */
     public function reversalPreview(Payment $payment): JsonResponse
     {
-        $before = $this->ledger->forStudent((int) $payment->student_id);
-        $after = $this->ledger->hypothetical(
+        ['before' => $before, 'after' => $after] = $this->ledger->beforeAndAfter(
             (int) $payment->student_id,
             excludedPaymentIds: [$payment->id],
         );
@@ -191,25 +200,6 @@ class PaymentController extends Controller
             'name' => User::composeName($student->first_name, $student->middle_name, $student->last_name)
                 ?: ($student->user?->name ?? ''),
             'login_id' => $student->user?->login_id,
-        ];
-    }
-
-    /**
-     * The balance block every cash-desk response carries beside the
-     * document it just wrote.
-     *
-     * @return array{total_invoiced: float, net_payments: float, balance: float, arrears: float, credit: float}
-     */
-    private function balanceSummary(int $studentId): array
-    {
-        $ledger = $this->ledger->forStudent($studentId);
-
-        return [
-            'total_invoiced' => $ledger['total_invoiced'],
-            'net_payments' => $ledger['net_payments'],
-            'balance' => $ledger['balance'],
-            'arrears' => $ledger['arrears'],
-            'credit' => $ledger['credit'],
         ];
     }
 }

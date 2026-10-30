@@ -430,6 +430,30 @@ test('the invoice list derives paid, outstanding and status from the ledger', fu
         ->assertJsonCount(2, 'invoices');
 });
 
+test('the invoice list derives every student\'s figures in a fixed number of queries', function () {
+    $token = financeAccessTokenFor(User::factory()->finance()->create());
+    $session = financeActiveSession();
+
+    // Three students, each billed twice and partly paid: the list must
+    // derive all of their figures in ONE query per ledger table, not
+    // three queries per student.
+    foreach (range(1, 3) as $i) {
+        [$student] = financeBillableStudent($session);
+
+        Invoice::factory()->count(2)->create([
+            'student_id' => $student->id,
+            'academic_session_id' => $session->id,
+        ]);
+    }
+
+    $this->expectsDatabaseQueryCount(12);
+
+    $this->withToken($token)
+        ->getJson('/api/invoices?per_page=100')
+        ->assertOk()
+        ->assertJsonCount(6, 'invoices');
+});
+
 test('the finance ledger has no edit and no delete anywhere', function () {
     $token = financeAccessTokenFor(User::factory()->finance()->create());
     $invoice = Invoice::factory()->create();

@@ -30,8 +30,7 @@ class StatementController extends Controller
      */
     public function __invoke(StudentProfile $student): JsonResponse
     {
-        $ledger = $this->ledger->forStudent($student->id);
-        $statement = $this->ledger->statement($student->id);
+        ['ledger' => $ledger, 'statement' => $statement] = $this->ledger->ledgerAndStatement($student->id);
 
         return response()->json([
             'student' => [

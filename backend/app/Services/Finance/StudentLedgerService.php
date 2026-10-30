@@ -57,22 +57,29 @@ class StudentLedgerService
      */
     public function forStudent(int $studentId): array
     {
-        return $this->hypothetical($studentId);
+        return $this->compute(
+            $this->invoiceRows($studentId),
+            $this->paymentRows($studentId),
+            $this->refundRows($studentId),
+        );
     }
 
     /**
-     * The ledger as it WOULD stand after hypothetical rows — the
-     * previews behind every confirmation dialog: how a payment of X
-     * would settle the invoices, what reversing an invoice or payment
-     * would do to the balance. No hypothetical is ever persisted.
+     * The ledger as it stands AND as it WOULD stand with hypothetical
+     * rows applied — the before/after pair behind every confirmation
+     * dialog: how a payment of X would settle the invoices, what
+     * reversing an invoice, payment or refund would do to the balance.
+     * Both sides come from ONE load of the ledger rows, and no
+     * hypothetical is ever persisted.
      *
      * @param  list<array{amount: int|float|string}>  $addedInvoices
      * @param  list<array{amount: int|float|string}>  $addedPayments
      * @param  list<array{amount: int|float|string}>  $addedRefunds
      * @param  list<int>  $excludedInvoiceIds
      * @param  list<int>  $excludedPaymentIds
+     * @return array{before: array<string, mixed>, after: array<string, mixed>}
      */
-    public function hypothetical(
+    public function beforeAndAfter(
         int $studentId,
         array $addedInvoices = [],
         array $addedPayments = [],
@@ -81,36 +88,98 @@ class StudentLedgerService
         array $excludedPaymentIds = [],
     ): array {
         $invoices = $this->invoiceRows($studentId);
+        $payments = $this->paymentRows($studentId);
+        $refunds = $this->refundRows($studentId);
+
+        // The real ledger first, from the untouched rows: the compute
+        // pass reads them without mutating, so the same collections
+        // may then carry the hypothetical rows for the "after" side.
+        $before = $this->compute($invoices, $payments, $refunds);
 
         foreach ($addedInvoices as $added) {
             $invoices->push($this->unsavedInvoice($studentId, (float) $added['amount']));
         }
 
-        $payments = $this->paymentRows($studentId);
-
         foreach ($addedPayments as $added) {
             $payments->push($this->unsavedPayment($studentId, (float) $added['amount']));
         }
-
-        $refunds = $this->refundRows($studentId);
 
         foreach ($addedRefunds as $added) {
             $refunds->push($this->unsavedRefund($studentId, (float) $added['amount']));
         }
 
-        return $this->compute(
+        $after = $this->compute(
             $invoices->reject(fn (Invoice $invoice): bool => in_array($invoice->id, $excludedInvoiceIds, true)),
             $payments->reject(fn (Payment $payment): bool => in_array($payment->id, $excludedPaymentIds, true)),
             $refunds,
         );
+
+        return ['before' => $before, 'after' => $after];
     }
 
     /**
-     * A student's statement: every ledger row in chronological order —
-     * invoices, invoice reversals, payments, payment reversals and
-     * refunds — each with a running balance. The closing balance
-     * reconciles exactly with the derived balance above.
+     * The balance block every money-moving response carries beside the
+     * document it just wrote — the ledger's five headline figures.
      *
+     * @return array{total_invoiced: float, net_payments: float, balance: float, arrears: float, credit: float}
+     */
+    public function summary(int $studentId): array
+    {
+        $ledger = $this->forStudent($studentId);
+
+        return [
+            'total_invoiced' => $ledger['total_invoiced'],
+            'net_payments' => $ledger['net_payments'],
+            'balance' => $ledger['balance'],
+            'arrears' => $ledger['arrears'],
+            'credit' => $ledger['credit'],
+        ];
+    }
+
+    /**
+     * The derived ledger and the chronological statement for one
+     * student from a single load of the ledger rows: every row in
+     * date order with a running balance, beside the same figures the
+     * rest of the desks read. The closing balance reconciles exactly
+     * with the ledger's balance, because both are derived from the
+     * same rows.
+     *
+     * @return array{
+     *     ledger: array{
+     *         invoices: list<array<string, mixed>>,
+     *         reversed_invoices: list<array<string, mixed>>,
+     *         total_invoiced: float,
+     *         net_payments: float,
+     *         balance: float,
+     *         arrears: float,
+     *         credit: float,
+     *     },
+     *     statement: array{
+     *         entries: list<array{date: string, type: string, document_number: string, description: string, debit: float, credit: float, running_balance: float}>,
+     *         closing_balance: float,
+     *         arrears: float,
+     *         credit: float,
+     *     },
+     * }
+     */
+    public function ledgerAndStatement(int $studentId): array
+    {
+        $invoices = $this->invoiceRows($studentId, withReverses: true);
+        $payments = $this->paymentRows($studentId, withReverses: true);
+        $refunds = $this->refundRows($studentId, withReverses: true);
+
+        return [
+            'ledger' => $this->compute($invoices, $payments, $refunds),
+            'statement' => $this->buildStatement($invoices, $payments, $refunds),
+        ];
+    }
+
+    /**
+     * The statement half of the pair above, over rows already loaded.
+     *
+     * @param  Collection<int, Invoice>  $invoices
+     * @param  Collection<int, Payment>  $payments
+     * @param  Collection<int, Refund>  $refunds
      * @return array{
      *     entries: list<array{date: string, type: string, document_number: string, description: string, debit: float, credit: float, running_balance: float}>,
      *     closing_balance: float,
@@ -118,11 +187,11 @@ class StudentLedgerService
      *     credit: float,
      * }
      */
-    public function statement(int $studentId): array
+    private function buildStatement(Collection $invoices, Collection $payments, Collection $refunds): array
     {
         $entries = [];
 
-        foreach ($this->invoiceRows($studentId) as $invoice) {
+        foreach ($invoices as $invoice) {
             $isReversal = $invoice->entry_kind === InvoiceEntryKind::Reversal;
             $amount = round(abs((float) $invoice->amount), 2);
 
@@ -142,7 +211,7 @@ class StudentLedgerService
             ];
         }
 
-        foreach ($this->paymentRows($studentId) as $payment) {
+        foreach ($payments as $payment) {
             $isReversal = $payment->entry_kind === PaymentEntryKind::PaymentReversal;
             $amount = round(abs((float) $payment->amount), 2);
 
@@ -162,7 +231,7 @@ class StudentLedgerService
             ];
         }
 
-        foreach ($this->refundRows($studentId) as $refund) {
+        foreach ($refunds as $refund) {
             $isReversal = $refund->entry_kind === RefundEntryKind::RefundReversal;
             $amount = round(abs((float) $refund->amount), 2);
 
@@ -211,20 +280,31 @@ class StudentLedgerService
      * of invoices across many students — the billing list reads them
      * through this one pass instead of per row.
      *
+     * The ledgers of every student on the set are loaded in ONE query
+     * per ledger table and derived here in memory, so the list runs a
+     * fixed number of queries instead of three (times two, with the
+     * relation loads) per student.
+     *
      * @param  iterable<int, Invoice>  $invoices
      * @return Collection<int, array{paid: float, outstanding: float, status: string}>
      */
     public function invoiceFigures(iterable $invoices): Collection
     {
+        $rows = collect($invoices)->groupBy(fn (Invoice $invoice): int => (int) $invoice->student_id);
+
+        if ($rows->isEmpty()) {
+            return new Collection;
+        }
+
+        $ledgers = $this->ledgersForStudents($rows->keys()->all());
+
         $figures = new Collection;
 
-        foreach (collect($invoices)->groupBy('student_id') as $studentId => $rows) {
-            $ledger = $this->forStudent((int) $studentId);
-
-            $byId = collect($ledger['invoices'])
+        foreach ($rows as $studentId => $studentRows) {
+            $byId = collect($ledgers->get((int) $studentId)['invoices'])
                 ->keyBy(fn (array $invoice): int => (int) $invoice['id']);
 
-            foreach ($rows as $row) {
+            foreach ($studentRows as $row) {
                 $figures->put((int) $row->id, $byId->get((int) $row->id, [
                     // Anything not in the active set — a reversal row
                     // or a reversed original — settles to zero.
@@ -236,6 +316,45 @@ class StudentLedgerService
         }
 
         return $figures;
+    }
+
+    /**
+     * The derived ledger for a whole set of students at once: one
+     * query per ledger table for the entire set, then one in-memory
+     * derivation per student — the batched twin of forStudent().
+     *
+     * @param  list<int>  $studentIds
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function ledgersForStudents(array $studentIds): Collection
+    {
+        $invoices = Invoice::query()
+            ->whereIn('student_id', $studentIds)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (Invoice $invoice): int => (int) $invoice->student_id);
+
+        $payments = Payment::query()
+            ->whereIn('student_id', $studentIds)
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (Payment $payment): int => (int) $payment->student_id);
+
+        $refunds = Refund::query()
+            ->whereIn('student_id', $studentIds)
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (Refund $refund): int => (int) $refund->student_id);
+
+        return (new Collection($studentIds))->mapWithKeys(fn (int $studentId): array => [
+            $studentId => $this->compute(
+                $invoices->get($studentId, new Collection),
+                $payments->get($studentId, new Collection),
+                $refunds->get($studentId, new Collection),
+            ),
+        ]);
     }
 
     /**
@@ -354,14 +473,20 @@ class StudentLedgerService
     }
 
     /**
-     * Every invoice row for one student, oldest first.
+     * Every invoice row for one student, oldest first. The reverses
+     * relation is opt-in: only the statement's descriptions read it.
      *
      * @return Collection<int, Invoice>
      */
-    private function invoiceRows(int $studentId): Collection
+    private function invoiceRows(int $studentId, bool $withReverses = false): Collection
     {
-        return Invoice::query()
-            ->with('reverses:id,invoice_number')
+        $query = Invoice::query();
+
+        if ($withReverses) {
+            $query->with('reverses:id,invoice_number');
+        }
+
+        return $query
             ->where('student_id', $studentId)
             ->orderBy('created_at')
             ->orderBy('id')
@@ -369,14 +494,20 @@ class StudentLedgerService
     }
 
     /**
-     * Every payment row for one student, oldest first.
+     * Every payment row for one student, oldest first. The reverses
+     * relation is opt-in: only the statement's descriptions read it.
      *
      * @return Collection<int, Payment>
      */
-    private function paymentRows(int $studentId): Collection
+    private function paymentRows(int $studentId, bool $withReverses = false): Collection
     {
-        return Payment::query()
-            ->with('reverses:id,receipt_number')
+        $query = Payment::query();
+
+        if ($withReverses) {
+            $query->with('reverses:id,receipt_number');
+        }
+
+        return $query
             ->where('student_id', $studentId)
             ->orderBy('payment_date')
             ->orderBy('id')
@@ -384,14 +515,20 @@ class StudentLedgerService
     }
 
     /**
-     * Every refund row for one student, oldest first.
+     * Every refund row for one student, oldest first. The reverses
+     * relation is opt-in: only the statement's descriptions read it.
      *
      * @return Collection<int, Refund>
      */
-    private function refundRows(int $studentId): Collection
+    private function refundRows(int $studentId, bool $withReverses = false): Collection
     {
-        return Refund::query()
-            ->with('reverses:id,refund_number')
+        $query = Refund::query();
+
+        if ($withReverses) {
+            $query->with('reverses:id,refund_number');
+        }
+
+        return $query
             ->where('student_id', $studentId)
             ->orderBy('id')
             ->get();
